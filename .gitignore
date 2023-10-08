@@ -129,3 +129,4 @@ dist
 # test folder
 test/
 main*
+.vscode/settings.json
