@@ -1,7 +1,15 @@
+import process from "node:process";
+
+export type Awaitable<T> = T | PromiseLike<T>
+export type Executable<Param extends any[] = [], Callback extends any = void> = (...args: Param) => Awaitable<Callback>
 export type DataType =
     | 'number'
     | 'string'
     | 'boolean'
+export type DataType_ =
+    | number
+    | string
+    | boolean
 export type DataRange<Param_1 extends any = number, Param_2 extends any = number> = [Param_1, Param_2]
 export interface DefinedType {
     keyword: string;
@@ -12,7 +20,7 @@ export type TestConfigRange = DataRange<number, number>
 export interface TestConfig {
     range: TestConfigRange | TestConfigRange[],
     count: number,
-    func?: (val: string) => boolean | PromiseLike<boolean>;
+    func?: Executable<[val: string], boolean>;
 }
 export interface GTConfig {
     testCount: number;
@@ -25,7 +33,7 @@ export class GenerateTest {
 
     constructor(config?: GTConfig) { if (config) this.setConfig(config) }
 
-    private setConfig(config: GTConfig) {
+    public setConfig(config: GTConfig) {
         this.testCount = config.testCount
         this.testConfig = config.testConfig.map((val): TestConfig => {
             const cond = val.count < 1 && val.count > -1
@@ -34,15 +42,16 @@ export class GenerateTest {
         })
     }
 
-    public async generate(testConfig: string, config?: GTConfig): Promise<string[]> {
-        if (config) this.setConfig(config)
+    public async generate(testConfig: string, config?: { config?: GTConfig, func: Executable<[index: number, data: string], void> }): Promise<any[]> {
+        if (config?.config) this.setConfig(config.config)
         testConfig = testConfig.replace(/\t/gi, '')
         const testConfig_array = testConfig.split(/-{5,}/).map((str) => str.replace(/\t/gi, '')),
             declares = testConfig_array[0].split('\n'),
             commands = testConfig_array[1].split('\n'),
             arrayReg_1 = /^\[(.+); (.+); "(.+)"\]$/,
             arrayReg_2 = /^\[(.+); (.+) - (.+); "(.+)"\]$/
-        let defined: DefinedType[] = [], test: string[] = [];
+        let defined: DefinedType[] = [],
+            test: DataType_[][][] = [];
         for (let i in declares) {
             if (declares[i] == '') continue;
             const declare = declares[i].split(' ');
@@ -64,13 +73,13 @@ export class GenerateTest {
                 return i + 1 <= lastCount.count
             })
             if (!dataSet) throw new Error(`cant find testConfig at test ${i}`)
-            console.log({ i, dataSet })
             const func = () => new Promise<void>(async (resolve) => {
                 for (let ind in commands) {
                     const cmd = commands[ind]
                     const cmds = cmd.split('; ');
-                    let line: string = '';
-                    let promise: Promise<void>[] = []
+                    let line: DataType_[][] = [];
+                    let line_: DataType_[] = []
+                    let promise: Promise<void>[] = [];
                     if (arrayReg_1.test(cmd) || arrayReg_2.test(cmd)) {
                         const type = arrayReg_2.test(cmd) ? 1 : 0
                         const exec = type == 0 ? arrayReg_1.exec(cmd) : arrayReg_2.exec(cmd)
@@ -82,45 +91,46 @@ export class GenerateTest {
                         if (!find) throw new Error(`unknow define at line ${ind} ("${exec[1]}")`)
                         let range: any[] = dataSet.range
                         range = Array.isArray(range[0]) ? range[defined.findIndex((def) => def.keyword == exec[1])] : range
-                        for (let i = 0; i < ((): number => {
+                        const it = (): number => {
                             const find = findFunc(exec[2])
                             if (!find) return Number(exec[2])
                             else
                                 if (typeof find.value == 'number') return find.value
                                 else throw new Error(`wrong const data type at line ${ind}`)
-                        })(); i++) promise.push(
+                        }
+                        for (let i = 0; i < it(); i++) promise.push(
                             new Promise<void>((resolve) => {
-                                let line_: string = ''
+                                let line_: DataType_[] = []
                                 let promise: Promise<void>[] = []
-                                for (let j = 0; j < (type == 1 ? ((): number => {
+                                const it = (type == 1 ? ((): number => {
                                     const find = findFunc(exec[3])
                                     if (!find) return Number(exec[3])
                                     else
                                         if (typeof find.value == 'number') return find.value
                                         else throw new Error(`wrong const data type at line ${ind}`)
-                                })() : 1); j++) promise.push(
+                                })() : 1)
+                                for (let j = 0; j < it; j++) promise.push(
                                     new Promise<void>((resolve) => {
-                                        if (find.dataType == 'string') line_ += this.getRandomString(...<DataRange<number, string>>find.dataRange) + ' '
-                                        else if (find.dataType == 'number') line_ += this.getRandomInt((find.dataRange[1] - find.dataRange[0]) * range[0] + find.dataRange[0], (find.dataRange[1] - find.dataRange[0]) * range[1] + find.dataRange[0]) + ' '
-                                        else if (find.dataType == 'boolean') line_ += `${Math.round(Math.random()) == 0} `
+                                        if (find.dataType == 'string') line_.push(this.getRandomString(...<DataRange<number, string>>find.dataRange))
+                                        else if (find.dataType == 'number') line_.push(this.getRandomInt((find.dataRange[1] - find.dataRange[0]) * range[0] + find.dataRange[0], (find.dataRange[1] - find.dataRange[0]) * range[1] + find.dataRange[0]))
+                                        else if (find.dataType == 'boolean') line_.push(Math.round(Math.random()) == 0)
                                         resolve()
                                     })
                                 )
                                 Promise.all(promise).then(() => {
-                                    line += `${line_}\n`
+                                    line.push(line_)
                                     resolve()
                                 })
                             })
                         )
                     } else {
-                        let line: string = ''
                         for (let index in cmds) promise.push(
                             new Promise<void>((resolve) => {
                                 let cmd_ = cmds[index].split(' '),
                                     cmd = cmd_[cmd_.length - 1],
                                     const_: boolean = cmd_.includes('const'),
                                     ghost: boolean = cmd_.includes('ghost'),
-                                    var_: any = '';
+                                    var_: DataType_ = '';
                                 if (cmd.startsWith('const ')) { cmd = cmd.slice('const '.length); const_ = true }
                                 if (cmd.trim() == '') resolve()
 
@@ -134,37 +144,45 @@ export class GenerateTest {
                                 else if (find.dataType == 'boolean') var_ = Math.round(Math.random()) == 0
 
                                 if (const_ == true) const_arr.push({ keyword: cmd, value: var_ })
-                                if (ghost != true) line += var_ + ' '
+                                if (ghost != true) line_.push(var_)
                                 resolve()
                             })
                         )
                     }
                     await Promise.all(promise)
-                    if (line == '') continue
-                    if (!test[i]) test[i] = ''
-                    test[i] += `${line}${line.endsWith('\n') ? '' : '\n'}`
-                    resolve()
+                    if (line_.length != 0) line.push(line_)
+                    if (line.length == 0) continue
+                    if (!test[i]) test[i] = []
+                    test[i].push(...line)
                 }
+                resolve()
             })
             await func()
+            const test_ = this.parseTest(test)
             if (dataSet.func) while (true) {
-                const func_ = await dataSet.func(test[i])
-                // console.log({ test: test[i], func_ })
+                const func_ = await dataSet.func(test_[i])
+                console.log({ test: test[i], func_ })
                 if (func_ == true) break;
-                else { test[i] = ''; await func() };
+                else { test_[i] = ''; await func() };
+            }
+            if (config?.func) {
+                await Promise.resolve(config.func(i, test_[i]))
+                delete test[i]
             }
             resolve()
         }))
-        await Promise.all(promise)
-        return test;
+        for (let i of promise) {
+            await Promise.resolve(i);
+        }
+        return this.parseTest(test)
     }
 
-    private getRandomInt(min: number, max: number) {
+    public getRandomInt(min: number, max: number) {
         min = Math.ceil(min);
         max = Math.floor(max);
         return Math.floor(Math.random() * (max - min + 1) + min);
     }
-    private getRandomString(length: number, type: string = '0') {
+    public getRandomString(length: number, type: string = '0') {
         let result = '';
         let characters = '';
         if (type.includes('0')) characters += 'abcdefghijklmnopqrstuvwxyz'
@@ -178,5 +196,12 @@ export class GenerateTest {
             counter += 1;
         }
         return result;
+    }
+    private parseTest(test: DataType_[][][]): string[] {
+        return test.map((val) =>
+            val.map((val) =>
+                val.join(' ')
+            ).join('\n')
+        );
     }
 }
