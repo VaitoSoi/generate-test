@@ -42,14 +42,19 @@ export class GenerateTest {
         })
     }
 
-    public async generate(testConfig: string, config?: { config?: GTConfig, func: Executable<[index: number, data: string], void> }): Promise<any[]> {
+    public async generate(testConfig: string, config?: {
+        config?: GTConfig,
+        func: Executable<[index: number, data: string], void>,
+        pushTest: boolean,
+        logMem?: boolean
+    }): Promise<any[]> {
         if (config?.config) this.setConfig(config.config)
         testConfig = testConfig.replace(/\t/gi, '')
         const testConfig_array = testConfig.split(/-{5,}/).map((str) => str.replace(/\t/gi, '')),
             declares = testConfig_array[0].split('\n'),
             commands = testConfig_array[1].split('\n'),
-            arrayReg_1 = /^\[(.+); (.+); "(.+)"\]$/,
-            arrayReg_2 = /^\[(.+); (.+) - (.+); "(.+)"\]$/
+            arrayReg_1 = /^\[(.+); (.+);\]$/,
+            arrayReg_2 = /^\[(.+); (.+) - (.+)\]$/
         let defined: DefinedType[] = [],
             test: DataType_[][][] = [];
         for (let i in declares) {
@@ -72,6 +77,7 @@ export class GenerateTest {
                 }
                 return i + 1 <= lastCount.count
             })
+            let prePushTest: DataType_[][] = [];
             if (!dataSet) throw new Error(`cant find testConfig at test ${i}`)
             const func = () => new Promise<void>(async (resolve) => {
                 for (let ind in commands) {
@@ -131,8 +137,8 @@ export class GenerateTest {
                                     const_: boolean = cmd_.includes('const'),
                                     ghost: boolean = cmd_.includes('ghost'),
                                     var_: DataType_ = '';
+                                if (cmd.trim() == '') resolve(void line_.push(''))
                                 if (cmd.startsWith('const ')) { cmd = cmd.slice('const '.length); const_ = true }
-                                if (cmd.trim() == '') resolve()
 
                                 const find = defined.find(def => def.keyword == cmd)
                                 if (!find) throw new Error(`unknow define at line ${ind} ("${cmd}")`)
@@ -143,7 +149,10 @@ export class GenerateTest {
                                 else if (find.dataType == 'number') var_ = this.getRandomInt((find.dataRange[1] - find.dataRange[0]) * range[0] + find.dataRange[0], (find.dataRange[1] - find.dataRange[0]) * range[1] + find.dataRange[0])
                                 else if (find.dataType == 'boolean') var_ = Math.round(Math.random()) == 0
 
-                                if (const_ == true) const_arr.push({ keyword: cmd, value: var_ })
+                                if (const_ == true) {
+                                    const_arr.splice(const_arr.findIndex((val) => val.keyword == cmd), 1)
+                                    const_arr.push({ keyword: cmd, value: var_ })
+                                }
                                 if (ghost != true) line_.push(var_)
                                 resolve()
                             })
@@ -152,9 +161,9 @@ export class GenerateTest {
                     await Promise.all(promise)
                     if (line_.length != 0) line.push(line_)
                     if (line.length == 0) continue
-                    if (!test[i]) test[i] = []
-                    test[i].push(...line)
+                    prePushTest = line
                 }
+                if (config?.logMem == true) console.log(`Testcase ${i}: ${process.memoryUsage().heapUsed / 1024 / 1024} / ${process.memoryUsage().heapTotal / 1024 / 1024} (MB)`)
                 resolve()
             })
             await func()
@@ -165,15 +174,14 @@ export class GenerateTest {
                 if (func_ == true) break;
                 else { test_[i] = ''; await func() };
             }
-            if (config?.func) {
+            if (config?.func)
                 await Promise.resolve(config.func(i, test_[i]))
-                delete test[i]
-            }
+            if (config?.pushTest == true) test.push(prePushTest)
             resolve()
         }))
-        for (let i of promise) {
+        for (let i of promise) 
             await Promise.resolve(i);
-        }
+
         return this.parseTest(test)
     }
 
@@ -182,15 +190,9 @@ export class GenerateTest {
         max = Math.floor(max);
         return Math.floor(Math.random() * (max - min + 1) + min);
     }
-    public getRandomString(length: number, type: string = '0') {
-        let result = '';
-        let characters = '';
-        if (type.includes('0')) characters += 'abcdefghijklmnopqrstuvwxyz'
-        if (type.includes('1')) characters += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-        if (type.includes('2')) characters += '0123456789'
-        if (type.includes('3')) characters += '!@#$%^&*'
+    public getRandomString(length: number, characters: string = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789') {
         const charactersLength = characters.length;
-        let counter = 0;
+        let counter = 0, result = '';
         while (counter < length) {
             result += characters.charAt(Math.floor(Math.random() * charactersLength));
             counter += 1;

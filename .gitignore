@@ -130,3 +130,4 @@ dist
 test/
 main*
 .vscode/settings.json
+README.md
