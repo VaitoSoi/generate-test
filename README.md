@@ -292,6 +292,8 @@ Phần gentest sẽ chia làm 3 loại:
 Nội dung cơ bản của file config (`config.yaml`):
 
 ```yaml
+MainCPP: file/main.cpp
+IOFile: test
 Count: 10
 Range: [
 
@@ -301,10 +303,9 @@ Config: >
   ------
   n
 TestFolder: file/testcases/
-OJFormatFolder: file/test_OJ/
-MainCPP: file/main.cpp
+OJFormatFolder:
 ZipFile: file/testcase.zip
-OJZipFile: file/testcase_OJ.zip
+OJZipFile: 
 DebugFile: true
 LogMemory: true
 TimeMeasure: true
@@ -312,9 +313,13 @@ TimeMeasure: true
 
 **Trong đó:**
 
-+ `Count`: Số lượng testcase.
++ `IOFile`: Tên của file input và out (chỉ ghi tên, không ghi phần đuôi `.INP` hoặc `.OUT`). *
 
-+ `Range`: Ràng buộc của từng test.
++ `MainCPP`: Địa chỉ nơi để file `C++` muốn test. *
+
++ `Count`: Số lượng testcase. *
+
++ `Range`: Ràng buộc của từng test. *
 
     **Lưu ý:**
 
@@ -333,7 +338,8 @@ TimeMeasure: true
         ```yaml
         {
             range: [], # Khoảng giá trị
-            count: 10  # Số lượng
+            count: 10, # Số lượng
+            func: ""   # Địa chỉ file
         }
         ```
 
@@ -354,6 +360,8 @@ TimeMeasure: true
                 **Lưu ý:** `min`, `max`: xem ở phần `Sau kiểu dữ liệu` ở [Phần Header](#b-phần-header-trên-dòng)
 
         + `count`: Số lượng test muốn áp dụng `Rule` này, có thể là một con số cố định hoặc viết dưới dạng phần trăm, khi này code sẽ từ động điều chỉnh theo số lượng test (vd: `30%` = `0.30`)
+
+        + `func`: Địa chỉ dẫn đến file có code JavaScript hoặc TypeScript xuất ra hàm để kiểm tra test; nếu hàm trả về `false` thì tiến hành tạo lại test, ngược lại thì tiếp tục`
 
         **Ví dụ:**
 
@@ -377,17 +385,15 @@ TimeMeasure: true
         }
         ```
 
-+ `Config`: [Config của code](#3-config-code).
++ `Config`: [Config của code](#3-config-code). *
 
-+ `TestFolder`: Thư mục để Testcase.
++ `TestFolder`: Thư mục để Testcase. *
 
-+ `OJFormatFolder`: Thư mục để file Test theo format của [VNOJ](https://oj.vnoi.info), bỏ trống nếu không cần thiết.
-
-+ `MainCPP`: Địa chỉ nơi để file `main.cpp`.
++ `OJFormatFolder`: Thư mục để file Test theo format của [VNOJ](https://oj.vnoi.info).
 
 + `ZipFile`: Địa chỉ nơi để file zip.
 
-+ `OJZipFile`: Địa chỉ nơi để file zip theo định dạng của `VNOJ`, bỏ trống nếu không cần thiết.
++ `OJZipFile`: Địa chỉ nơi để file zip theo định dạng của `VNOJ`.
 
 + `DebugFile`: Xuất file `debug.log` (ghi lại các message mà compile xuất ra) (giá trị là `true` hoặc `False`)
 
@@ -395,7 +401,7 @@ TimeMeasure: true
 
 + `MeasureTime`: Xuất thông tin về thời gian chạy của từng test (chỉ mang tính chất tham khảo) (giá trị là `true` hoặc `false`)
 
-+ `CustomFunc`: Địa chỉ dẫn đến file có code JavaScript hoặc TypeScript xuất ra hàm để kiểm tra test; nếu hàm trả về `false` thì tiến hành tạo lại test, ngược lại thì tiếp tục
+**Lưu ý:** * Quan trọng, không được bỏ trống
 
 ### 4. Chạy code:
 

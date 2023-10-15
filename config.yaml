@@ -3,8 +3,17 @@ Range: [
 
 ]
 Config: >
-  
-Folder: file/testcases/
+  n number 1 1000
+  ------
+  n
+TestFolder: file/testcases/
+OJFormatFolder:
 MainCPP: file/main.cpp
-ZipFile: file/testzip.case
-DebugFile: true 
+ZipFile: file/testcase.zip
+OJZipFile: 
+DebugFile: true
+LogMemory: true
+TimeMeasure: true
+CustomFunc: 
+
+# Xem thêm ở file README.md
