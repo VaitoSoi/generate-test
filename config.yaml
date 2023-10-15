@@ -1,0 +1,10 @@
+Count: 10
+Range: [
+
+]
+Config: >
+  
+Folder: file/testcases/
+MainCPP: file/main.cpp
+ZipFile: file/testzip.case
+DebugFile: true 

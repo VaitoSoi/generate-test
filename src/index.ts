@@ -55,10 +55,10 @@ export class GenerateTest {
         const testConfig_array = testConfig.split(/-{5,}/).map((str) => str.replace(/\t/gi, '')),
             declares = testConfig_array[0].split('\n'),
             commands = testConfig_array[1].split('\n'),
-            arrayReg_1 = /^\[(.+), (.+); "(.+)"\]$/,
-            arrayReg_2 = /^\[(.+); (.+) - (.+); "(.+)"\]$/,
+            arrayReg_1 = /^\[(.+), (.+)\]$/,
+            arrayReg_2 = /^\[(.+), (.+) - (.+), "(.+)"\]$/,
             constReg = /\[(.+)\]/,
-            rangeReg = /\[(.+)-(.+)\]/
+            rangeReg = /\[(.+) - (.+)\]/
         let defined: DefinedType[] = [],
             test: DataType_[][][] = [];
         for (let i in declares) {
@@ -130,7 +130,7 @@ export class GenerateTest {
                                 })() : 1)
                                 for (let j = 0; j < it; j++) promise.push(
                                     new Promise<void>(async (resolve) => {
-                                        const cmd = exec[1].split(' ')
+                                        const cmd = exec[1].split('; ')
                                         let promises: Promise<void>[] = []
                                         for (let k = 0; k < cmd.length; k++) promise.push(new Promise((resolve) => {
                                             if (rangeReg.test(cmd[k])) {
