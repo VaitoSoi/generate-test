@@ -68,14 +68,14 @@ Bạn có thể tham khảo bộ chạy (runtime environment) sau:
 |---|---|---|
 | [**Bun**](https://bun.sh/) | + Tốc độ nhanh nhất | - Cộng đồng còn nhỏ |
 || + Sử dụng JavaScriptCore | - Một số tính năng chưa được hỗ trợ đầy đủ |
-|| + Hỗ trợ các tính năng hiện đại |
+|| + Hỗ trợ các tính năng hiện đại | **- Không thể tạo file zip bằng thư viện ngoài**
 || + Mới ra mắt nên còn khá ít lỗi |
-| [**NodeJS**](https://nodejs.org/en) | + Cộng đồng lớn và tích cực | + Tốc độ chậm hơn Bun và Deno |
-|| + Hỗ trợ nhiều thư viện và công cụ | + An toàn chưa được tối ưu |
-|| + Tương thích ngược với NodeJS 12.x | + Tính ổn định chưa cao |
-| [**Deno**](https://deno.com/) | * An toàn và bảo mật cao | * Tốc độ chậm hơn Bun |
-|| * Được xây dựng trên nền tảng V8 mới nhất của Google | * Cộng đồng còn nhỏ |
-|| * Hỗ trợ các tính năng hiện đại | * Một số tính năng chưa được hỗ trợ đầy đủ |
+| [**NodeJS**](https://nodejs.org/en) | + Cộng đồng lớn và tích cực | - Tốc độ chậm hơn Bun và Deno |
+|| + Hỗ trợ nhiều thư viện và công cụ | - An toàn chưa được tối ưu |
+|| + Tương thích ngược với NodeJS 12.x | - Tính ổn định chưa cao |
+| [**Deno**](https://deno.com/) | + An toàn và bảo mật cao | - Tốc độ chậm hơn Bun |
+|| + Được xây dựng trên nền tảng V8 mới nhất của Google | - Cộng đồng còn nhỏ |
+|| + Hỗ trợ các tính năng hiện đại | - Một số tính năng chưa được hỗ trợ đầy đủ |
 
 
 **Ý kiến cá nhân của dev:** Các bạn nên dùng [Bun](https://bun.sh/) vì ưu điểm quản lý bộ nhớ tốt, nhanh, giảm thời gian chạy khi sinh test lớn.
@@ -304,7 +304,7 @@ Count: 10
 Range: [
 
 ]
-Config: >
+Config: |
   n number 1 1000
   ------
   n
@@ -315,6 +315,7 @@ OJZipFile:
 DebugFile: true
 LogMemory: true
 TimeMeasure: true
+ZipProram: system
 ```
 
 **Trong đó:**
@@ -391,7 +392,7 @@ TimeMeasure: true
         }
         ```
 
-+ `Config`: [Config của code](#3-config-code). *
++ `Config`: [Config của code](#3-config-code), lưu ý: có thụt lề. *
 
 + `TestFolder`: Thư mục để Testcase. *
 
@@ -406,6 +407,16 @@ TimeMeasure: true
 + `LogMemory`: Xuất thông tin về lượng RAM đang sử dụng (giá trị là `true` hoặc `false`)
 
 + `MeasureTime`: Xuất thông tin về thời gian chạy của từng test (chỉ mang tính chất tham khảo) (giá trị là `true` hoặc `false`)
+
++ `ZipProgram`: Là phần mềm tạo file zip, gồm:
+
+    + `system`: Dùng phần mềm của hệ thống (Windows: [`PowerShell`](https://stackoverflow.com/a/40228216); Ubuntu: [`Zip`](https://askubuntu.com/a/86852))
+
+    + `jar`: Dùng [`jar`](https://stackoverflow.com/a/29879102) (Java) (yêu cầu có [`Java`](https://www.java.com/en/) trên máy)
+
+    + `package`: Dùng thư viện [`node-archiver`](https://www.npmjs.com/package/archiver/v/5.3.1) ([GitHub](https://github.com/archiverjs/node-archiver))
+
+    **Lưu ý:** Bộ chạy Bun không thể tạo file zip bằng thư viện
 
 **Lưu ý:** * Quan trọng, không được bỏ trống
 

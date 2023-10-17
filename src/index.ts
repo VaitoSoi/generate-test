@@ -57,6 +57,7 @@ export class GenerateTest {
             commands = testConfig_array[1].split('\n'),
             arrayReg_1 = /^\[(.+), (.+)\]$/,
             arrayReg_2 = /^\[(.+), (.+) - (.+), "(.+)"\]$/,
+            arrayReg_3 = /^\[(.+), (.+) - (.+), ""\]$/,
             constReg = /\[(.+)\]/,
             rangeReg = /\[(.+) - (.+)\]/
         let defined: DefinedType[] = [],
@@ -101,10 +102,11 @@ export class GenerateTest {
                     let line: DataType_[][] = [];
                     let line_: DataType_[] = []
                     let promise: Promise<void>[] = [];
-                    if (arrayReg_1.test(cmd) || arrayReg_2.test(cmd)) {
-                        const type = arrayReg_2.test(cmd) ? 1 : 0
-                        const exec = type == 0 ? arrayReg_1.exec(cmd) : arrayReg_2.exec(cmd)
+                    if (arrayReg_1.test(cmd) || arrayReg_2.test(cmd) || arrayReg_3.test(cmd)) {
+                        const type = arrayReg_2.test(cmd) || arrayReg_3.test(cmd) ? 1 : 0
+                        const exec = type == 0 ? arrayReg_1.exec(cmd) : (arrayReg_2.exec(cmd) || arrayReg_3.exec(cmd))
                         if (!exec) throw new Error('unknown format');
+                        if (arrayReg_3.test(cmd)) exec.push('')
 
                         join = type == 0 ? exec[3] : exec[4]
 

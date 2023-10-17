@@ -4,7 +4,7 @@ Count: 10
 Range: [
 
 ]
-Config: >
+Config: |
   n number 1 1000
   ------
   n
