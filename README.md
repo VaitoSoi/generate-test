@@ -113,7 +113,7 @@ Tên  Kiểu dữ liệu  Sau kiểu dữ liệu
 
 + `Tên`: là tên của định nghĩa (define) này.
 
-+ `Kiểu dữ liệu`: kiểu dữ liệu của define, gồm `number`, `string`, `boolean`.
++ `Kiểu dữ liệu`: kiểu dữ liệu của define, gồm `number`, `string`, `boolean` và `char`.
 
 + `Sau kiểu dữ liệu`: dùng để xác định giới hạn của define (xác định min, max hoặc độ dài, chế độ cho việc tạo biến.)
 
@@ -139,7 +139,15 @@ Tên  Kiểu dữ liệu  Sau kiểu dữ liệu
 
     + Để tạo 1 chuỗi chỉ gồm chữ in hoa và ký tự đặc biệt thì chế độ sẽ là `13`
 
-+ `boolean`: không có
++ `boolean`: không có.
+
++ `char`: gồm một chuỗi chứa các ký tự muốn tạo.
+
+    **Ví dụ**: Chọn 1 ký tự ngẫu nhiên trong chuỗi sau `ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789` thì phần Header sẽ viết như sau:
+
+    ```
+    c char ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+    ```
 
 #### c. Phần body (dưới dòng `-----`):
 
@@ -151,9 +159,7 @@ n            < Tạo một số
 ```
 Phần gentest sẽ chia làm 3 loại:
 
-+ Tạo số:
-
-    Nếu bạn chỉ muốn trên trên dòng này thì bạn nhập tên của define mà bạn đã thiết lập ở phần Header.
++ Tạo số, chữ hoặc chuỗi:
 
     **Vd**:
 
@@ -361,7 +367,7 @@ TimeMeasure: true
 
         + `count`: Số lượng test muốn áp dụng `Rule` này, có thể là một con số cố định hoặc viết dưới dạng phần trăm, khi này code sẽ từ động điều chỉnh theo số lượng test (vd: `30%` = `0.30`)
 
-        + `func`: Địa chỉ dẫn đến file có code JavaScript hoặc TypeScript xuất ra hàm để kiểm tra test; nếu hàm trả về `false` thì tiến hành tạo lại test, ngược lại thì tiếp tục`
+        + `func`: Địa chỉ dẫn đến file có code JavaScript hoặc TypeScript xuất ra hàm để kiểm tra test; nếu hàm trả về `false` thì tiến hành tạo lại test, ngược lại thì tiếp tục
 
         **Ví dụ:**
 

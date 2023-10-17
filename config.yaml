@@ -1,3 +1,5 @@
+MainCPP: file/main.cpp
+IOFile: TEST
 Count: 10
 Range: [
 
@@ -7,13 +9,11 @@ Config: >
   ------
   n
 TestFolder: file/testcases/
-OJFormatFolder:
-MainCPP: file/main.cpp
+OJFormatFolder: file/test_oj/
 ZipFile: file/testcase.zip
-OJZipFile: 
+OJZipFile: file/test_oj.zip
 DebugFile: true
 LogMemory: true
 TimeMeasure: true
-CustomFunc: 
 
 # Xem thêm ở file README.md

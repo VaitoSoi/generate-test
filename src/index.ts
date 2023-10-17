@@ -37,11 +37,12 @@ export class GenerateTest {
 
     public setConfig(config: GTConfig) {
         this.testCount = config.testCount
-        this.testConfig = config.testConfig.map((val): TestConfig => {
-            const cond = val.count < 1 && val.count > -1
-            if (cond == true) return { range: val.range, count: val.count * this.testCount, func: val.func }
-            else return val
-        })
+        this.testConfig = config.testConfig
+            .map((val): TestConfig => {
+                const cond = val.count < 1 && val.count > -1
+                if (cond == true) return { range: val.range, count: val.count * this.testCount, func: val.func }
+                else return val
+            })
     }
 
     public async generate(testConfig: string, config?: {
@@ -50,7 +51,6 @@ export class GenerateTest {
         config?: GTConfig,
         func?: Executable<[index: number, data: string], void>
     }): Promise<any[]> {
-        if (config?.config) this.setConfig(config.config)
         testConfig = testConfig.replace(/\t/gi, '')
         const testConfig_array = testConfig.split(/-{5,}/).map((str) => str.replace(/\t/gi, '')),
             declares = testConfig_array[0].split('\n'),

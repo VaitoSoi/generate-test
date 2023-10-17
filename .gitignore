@@ -130,3 +130,6 @@ dist
 test/
 main*
 .vscode/settings.json
+
+# test thing
+file/

@@ -14,7 +14,9 @@
     "denoRun": "deno run -A src/generate.ts"
   },
   "dependencies": {
+    "@types/archiver": "^5.3.3",
     "@types/node": "^20.8.6",
+    "archiver": "^6.0.1",
     "ts-node": "^10.9.1",
     "typescript": "^5.2.2",
     "yaml": "^2.3.3"
