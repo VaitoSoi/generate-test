@@ -19,7 +19,7 @@ if (
     !config.Range ||
     !config.Config ||
     !config.TestFolder ||
-    !config.MainCPP ||
+    // !config.MainCPP ||
     !config.IOFile
 ) throw new Error(`missing configuration parameter, please read README.md file for more information`)
 
@@ -54,8 +54,11 @@ async function run() {
         const files = fs.readdirSync(join(config.OJFormatFolder)).filter((file) => fs.lstatSync(join(config.OJFormatFolder, file)).isFile())
         for (let i in files) fs.unlinkSync(join(config.OJFormatFolder, files[i]))
     }
-    let mainCPP = config.MainCPP.split('/') as string[]
-    await promiseExce(`g++ ${mainCPP.pop()} -o main`, { cwd: join(...mainCPP) }, config.DebugFile == true ? join(...mainCPP, 'debug.log') : undefined)
+    let mainCPP: string[] = []
+    if (config.MainCPP) {
+        mainCPP = config.MainCPP.split('/') as string[];
+        await promiseExce(`g++ ${mainCPP.pop()} -o main`, { cwd: join(...mainCPP) }, config.DebugFile == true ? join(...mainCPP, 'debug.log') : undefined)
+    }
 
     await gt.generate(config.Config as string, {
         pushTest: false,
@@ -66,19 +69,23 @@ async function run() {
             if (!fs.existsSync(path)) fs.mkdirSync(path)
 
             fs.writeFileSync(join(path, `${filename}.INP`), data)
-            fs.copyFileSync(join(...mainCPP, 'main'), join(path, 'main'))
 
-            if (config.MeasureTime) console.time(`testcase_${i + 1}`)
-            await promiseExce('./main', { cwd: path }, join(path, 'debug.log'))
-            if (config.MeasureTime) console.timeEnd(`testcase_${i + 1}`)
-            else console.log(`Done testcase ${i + 1}`)
+            if (config.MainCPP) {
+                fs.copyFileSync(join(...mainCPP, 'main'), join(path, 'main'))
+
+                if (config.TimeMeasure) console.time(`testcase_${i + 1}`)
+                await promiseExce('./main', { cwd: path }, join(path, 'debug.log'))
+                if (config.TimeMeasure) console.timeEnd(`testcase_${i + 1}`)
+                else console.log(`Done testcase ${i + 1}`)
+            } else console.log(`Generated testcase ${i + 1}`)
 
             if (config.OJFormatFolder) {
                 if (fs.existsSync(join(path, `${filename}.INP`))) fs.copyFileSync(join(path, `${filename}.INP`), join(config.OJFormatFolder, `${i + 1}.INP`))
                 else console.log(`Cant find ${filename}.INP in case ${i + 1}`)
-
-                if (fs.existsSync(join(path, `${filename}.OUT`))) fs.copyFileSync(join(path, `${filename}.OUT`), join(config.OJFormatFolder, `${i + 1}.OUT`))
-                else console.log(`Cant find ${filename}.OUT in case ${i + 1}`)
+                
+                if (config.MainCPP)
+                    if (fs.existsSync(join(path, `${filename}.OUT`))) fs.copyFileSync(join(path, `${filename}.OUT`), join(config.OJFormatFolder, `${i + 1}.OUT`))
+                    else console.log(`Cant find ${filename}.OUT in case ${i + 1}`)
             }
             resolve()
         })
@@ -138,6 +145,7 @@ function zip(sourceDir: string, outPath: string): Promise<void> {
                 resolve()
                 break;
             case 'package':
+                if (runtime == 'bun') throw new Error(`Bun runtime is not supported for zip file using package`)
                 await zipDirectory(sourceDir, outPath)
                 resolve()
                 break;

@@ -22,12 +22,13 @@ export type TestConfigRange = DataRange<number, number>
 export interface TestConfig {
     range: TestConfigRange | TestConfigRange[],
     count: number,
-    func?: Executable<[val: string], boolean>;
+    func?: Executable<[val: string, ...param: any[]], boolean>;
 }
 export interface GTConfig {
     testCount: number;
     testConfig: TestConfig[]
 }
+export type ConstantArray = { keyword: string, value: DataType_ }
 
 export class GenerateTest {
     private testCount: number = 10;
@@ -52,14 +53,12 @@ export class GenerateTest {
         func?: Executable<[index: number, data: string], void>
     }): Promise<any[]> {
         testConfig = testConfig.replace(/\t/gi, '')
-        const testConfig_array = testConfig.split(/-{5,}/).map((str) => str.replace(/\t/gi, '')),
+        const testConfig_array = testConfig.split(/-{5,}/),
             declares = testConfig_array[0].split('\n'),
             commands = testConfig_array[1].split('\n'),
             arrayReg_1 = /^\[(.+), (.+)\]$/,
             arrayReg_2 = /^\[(.+), (.+) - (.+), "(.+)"\]$/,
-            arrayReg_3 = /^\[(.+), (.+) - (.+), ""\]$/,
-            constReg = /\[(.+)\]/,
-            rangeReg = /\[(.+) - (.+)\]/
+            arrayReg_3 = /^\[(.+), (.+) - (.+), ""\]$/
         let defined: DefinedType[] = [],
             test: DataType_[][][] = [];
         for (let i in declares) {
@@ -81,7 +80,7 @@ export class GenerateTest {
         }
         let promise: Promise<void>[] = []
         for (let i = 0; i < this.testCount; i++) promise.push(new Promise(async (resolve) => {
-            let const_arr: { keyword: string, value: number | string | boolean }[] = []
+            let const_arr: ConstantArray[] = []
             let prePush: DataType_[][] = []
             let join: string = ' ';
             let lastCount: any = { i: -1, count: 0 };
@@ -135,35 +134,7 @@ export class GenerateTest {
                                         const cmd = exec[1].split('; ')
                                         let promises: Promise<void>[] = []
                                         for (let k = 0; k < cmd.length; k++) promise.push(new Promise((resolve) => {
-                                            if (rangeReg.test(cmd[k])) {
-                                                const exec = rangeReg.exec(cmd[k])
-                                                if (!exec) throw new Error('unknown format');
-                                                const find1 = findFunc(exec[1]) || { value: exec[1] }
-                                                const find2 = findFunc(exec[2]) || { value: exec[2] }
-                                                line_.push(this.getRandomInt(Number(find1.value), Number(find2.value)))
-                                            } else if (constReg.test(cmd[k])) {
-                                                const exec = constReg.exec(cmd[k])
-                                                if (!exec) throw new Error('unknown format');
-                                                const find = findFunc(exec[1])
-                                                if (!find) throw new Error(`cant find const with name '${exec[1]}' at line ${ind}`)
-                                                else line_.push(find.value)
-                                            } else {
-                                                const find = defined.find(def => def.keyword == cmd[k])
-                                                if (!find) throw new Error(`unknow define at line ${ind} ("${cmd}")`)
-                                                if (find.dataType == 'string') line_.push(this.getRandomString(find.dataRange[0] * range[1], find.dataRange[1]))
-                                                else if (find.dataType == 'number') line_.push(
-                                                    (
-                                                        find.negative == true
-                                                            ? (Math.round(Math.random()) == 0 ? -1 : 1)
-                                                            : 1
-                                                    ) * this.getRandomInt(
-                                                        (find.dataRange[1] - find.dataRange[0]) * range[0] + find.dataRange[0],
-                                                        (find.dataRange[1] - find.dataRange[0]) * range[1] + find.dataRange[0]
-                                                    )
-                                                )
-                                                else if (find.dataType == 'boolean') line_.push(Math.round(Math.random()) == 0)
-                                                else if (find.dataType == 'char') line_.push(this.getRandomChar(find.dataRange[0]))
-                                            }
+                                            line_.push(this.parseCMD(cmd[k], range as any, defined, const_arr, ind))
                                             resolve()
                                         }))
                                         resolve(void await Promise.all(promises))
@@ -178,45 +149,17 @@ export class GenerateTest {
                     } else {
                         for (let index in cmds) promise.push(
                             new Promise<void>((resolve) => {
-                                let cmd_ = cmds[index].split(' '),
-                                    cmd = cmd_[cmd_.length - 1],
-                                    const_: boolean = cmd_.includes('const'),
-                                    ghost: boolean = cmd_.includes('ghost'),
-                                    var_: DataType_ = '';
-                                if (cmd.startsWith('const ')) { cmd = cmd.slice('const '.length); const_ = true }
+                                const cmd_ = cmds[index].split(' '),
+                                    cmd = cmd_[cmd_.length - 1]
                                 if (cmd.trim() == '') resolve()
 
-                                if (rangeReg.test(cmd)) {
-                                    const exec = rangeReg.exec(cmd)
-                                    if (!exec) throw new Error('unknown format');
-                                    const find1 = findFunc(exec[1]) || { value: exec[1] }
-                                    const find2 = findFunc(exec[2]) || { value: exec[2] }
-                                    line_.push(this.getRandomInt(Number(find1.value), Number(find2.value)))
-                                } else if (constReg.test(cmd)) {
-                                    const exec = constReg.exec(cmd)
-                                    if (!exec) throw new Error('unknown format');
-                                    const find = const_arr.find(val => val.keyword == exec[1])
-                                    if (!find) throw new Error(`cant find const with name '${exec[1]}' at line ${ind}`)
-                                    else var_ = find.value
-                                } else {
-                                    const find = defined.find(def => def.keyword == cmd)
-                                    if (!find) throw new Error(`unknow define at line ${ind} ("${cmd}")`)
-                                    let range: any[] = dataSet.range
-                                    range = Array.isArray(range[0]) ? range[defined.findIndex((def) => def.keyword == cmd)] : range
+                                let range: any[] = dataSet.range
+                                range = Array.isArray(range[0]) ? range[defined.findIndex((def) => def.keyword == cmd)] : range
+                                
+                                const const_: boolean = cmd_.includes('const'),
+                                    ghost: boolean = cmd_.includes('ghost'),
+                                    var_ = this.parseCMD(cmd, range as any, defined, const_arr, ind)
 
-                                    if (find.dataType == 'string') var_ = this.getRandomString(find.dataRange[0] * range[1], find.dataRange[1])
-                                    else if (find.dataType == 'number') var_ =
-                                        (
-                                            find.negative == true
-                                                ? (Math.floor(Math.random()) == 1 ? -1 : 1)
-                                                : 1
-                                        ) * this.getRandomInt(
-                                            (find.dataRange[1] - find.dataRange[0]) * range[0] + find.dataRange[0],
-                                            (find.dataRange[1] - find.dataRange[0]) * range[1] + find.dataRange[0]
-                                        )
-                                    else if (find.dataType == 'boolean') var_ = Math.round(Math.random()) == 0
-                                    else if (find.dataType == 'char') var_ = this.getRandomChar(find.dataRange[0])
-                                }
                                 if (const_ == true) const_arr.push({ keyword: cmd, value: var_ })
                                 if (ghost != true) line_.push(var_)
                                 resolve()
@@ -234,7 +177,7 @@ export class GenerateTest {
             await func()
             let test_ = this.parseTest2D(prePush, join)
             if (dataSet.func) while (true) {
-                const func_ = await dataSet.func(test_)
+                const func_ = await dataSet.func(test_, i)
                 if (func_ == true) break;
                 else { prePush = []; await func(); test_ = this.parseTest2D(prePush, join) };
             }
@@ -282,5 +225,40 @@ export class GenerateTest {
         return test.map((val) =>
             val.join(join)
         ).join('\n')
+    }
+    private parseCMD(cmd: string, range: TestConfigRange, defined: DefinedType[], const_arr: ConstantArray[], debug?: any): DataType_ {
+        const findFunc = (val: string) => const_arr.find(def => def.keyword == val)
+        const constReg = /\[(.+)\]/,
+            rangeReg = /\[(.+) - (.+)\]/
+        let line_: DataType_ = ''
+        if (rangeReg.test(cmd)) {
+            const exec = rangeReg.exec(cmd)
+            if (!exec) throw new Error('unknown format');
+            const find1 = findFunc(exec[1]) || { value: exec[1] }
+            const find2 = findFunc(exec[2]) || { value: exec[2] }
+            line_ = this.getRandomInt(Number(find1.value), Number(find2.value))
+        } else if (constReg.test(cmd)) {
+            const exec = constReg.exec(cmd)
+            if (!exec) throw new Error('unknown format');
+            const find = findFunc(exec[1])
+            if (!find) throw new Error(`cant find const with name "${exec[1]}" at line ${debug}`)
+            else line_ = find.value
+        } else {
+            const find = defined.find(def => def.keyword == cmd)
+            if (!find) throw new Error(`unknow define "${cmd}" at line ${debug}`)
+            if (find.dataType == 'string') line_ = this.getRandomString(find.dataRange[0] * range[1], find.dataRange[1])
+            else if (find.dataType == 'number') line_ =
+                (
+                    find.negative == true
+                        ? (Math.round(Math.random()) == 0 ? -1 : 1)
+                        : 1
+                ) * this.getRandomInt(
+                    (find.dataRange[1] - find.dataRange[0]) * range[0] + find.dataRange[0],
+                    (find.dataRange[1] - find.dataRange[0]) * range[1] + find.dataRange[0]
+                )
+            else if (find.dataType == 'boolean') line_ = Math.round(Math.random()) == 0
+            else if (find.dataType == 'char') line_ = this.getRandomChar(find.dataRange[0])
+        }
+        return line_
     }
 }
