@@ -1,16 +1,16 @@
-import { parse } from 'yaml'
-import fs, { readFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import yaml from 'yaml'
+import fs from 'node:fs'
+import path from 'node:path'
 import { GenerateTest } from './index.ts'
-import child, { ExecOptions, exec } from 'node:child_process'
+import child from 'node:child_process'
 import archiver from 'archiver'
 import process from 'node:process'
 import os from 'node:os'
 
-const config = parse(readFileSync(process.argv[2] || './config.yaml', 'utf8'))
+const config = yaml.parse(fs.readFileSync(process.argv[2] || './config.yaml', 'utf8'))
 config.Range = config.Range.map((val: { range: number[], count: number, func?: string }) => {
     let output = val
-    if (!!output.func) output.func = require(join('..', output.func)).default
+    if (!!output.func) output.func = require(path.join('..', output.func)).default
     else output.func = undefined
     return output
 })
@@ -32,7 +32,6 @@ const gt = new GenerateTest({
 })
 
 run()
-// zip(join(resolve(), config.TestFolder), config.ZipFile)
 
 async function run() {
     const folder = config.TestFolder.toString().replace('./', '').split('/').slice(0, -1)
@@ -41,8 +40,8 @@ async function run() {
         subfolder += `${folder[i]}/`
         if (!fs.existsSync(subfolder)) fs.mkdirSync(subfolder)
     }
-    const folders = fs.readdirSync(join(config.TestFolder)).filter((dir) => fs.lstatSync(join(config.TestFolder, dir)).isDirectory())
-    for (let i in folders) fs.rmSync(join(config.TestFolder, folders[i]), { recursive: true, force: true })
+    const folders = fs.readdirSync(path.join(config.TestFolder)).filter((dir) => fs.lstatSync(path.join(config.TestFolder, dir)).isDirectory())
+    for (let i in folders) fs.rmSync(path.join(config.TestFolder, folders[i]), { recursive: true, force: true })
 
     if (!!config.OJFormatFolder) {
         const folder = config.OJFormatFolder.toString().replace('./', '').split('/').slice(0, -1)
@@ -51,13 +50,13 @@ async function run() {
             subfolder += `${folder[i]}/`
             if (!fs.existsSync(subfolder)) fs.mkdirSync(subfolder)
         }
-        const files = fs.readdirSync(join(config.OJFormatFolder)).filter((file) => fs.lstatSync(join(config.OJFormatFolder, file)).isFile())
-        for (let i in files) fs.unlinkSync(join(config.OJFormatFolder, files[i]))
+        const files = fs.readdirSync(path.join(config.OJFormatFolder)).filter((file) => fs.lstatSync(path.join(config.OJFormatFolder, file)).isFile())
+        for (let i in files) fs.unlinkSync(path.join(config.OJFormatFolder, files[i]))
     }
     let mainCPP: string[] = []
     if (config.MainCPP) {
         mainCPP = config.MainCPP.split('/') as string[];
-        await promiseExce(`g++ ${mainCPP.pop()} -o main`, { cwd: join(...mainCPP) }, config.DebugFile == true ? join(...mainCPP, 'debug.log') : undefined)
+        await promiseExce(`g++ ${mainCPP.pop()} -o main`, { cwd: path.join(...mainCPP) }, config.DebugFile == true ? path.join(...mainCPP, 'debug.log') : undefined)
     }
 
     await gt.generate(config.Config as string, {
@@ -65,28 +64,30 @@ async function run() {
         logMem: config.LogMemory as boolean || false,
         config: config.Config,
         func: (i, data) => new Promise(async (resolve) => {
-            const path = join(config.TestFolder, `CASE_${i + 1}`), filename = config.IOFile
-            if (!fs.existsSync(path)) fs.mkdirSync(path)
+            // console.log(config)
+            const path_ = path.join(config.TestFolder, `CASE_${i + 1}`), filename = config.IOFile
+            if (!fs.existsSync(path_)) fs.mkdirSync(path_)
 
-            fs.writeFileSync(join(path, `${filename}.INP`), data)
+            fs.writeFileSync(path.join(path_, `${filename}.INP`), data)
 
             if (config.MainCPP) {
-                fs.copyFileSync(join(...mainCPP, 'main'), join(path, 'main'))
+                fs.copyFileSync(path.join(...mainCPP, 'main'), path.join(path_, 'main'))
 
                 if (config.TimeMeasure) console.time(`testcase_${i + 1}`)
-                await promiseExce('./main', { cwd: path }, join(path, 'debug.log'))
+                child.execSync('./main', { cwd: path_ })
                 if (config.TimeMeasure) console.timeEnd(`testcase_${i + 1}`)
                 else console.log(`Done testcase ${i + 1}`)
             } else console.log(`Generated testcase ${i + 1}`)
 
             if (config.OJFormatFolder) {
-                if (fs.existsSync(join(path, `${filename}.INP`))) fs.copyFileSync(join(path, `${filename}.INP`), join(config.OJFormatFolder, `${i + 1}.INP`))
+                if (fs.existsSync(path.join(path_, `${filename}.INP`))) fs.copyFileSync(path.join(path_, `${filename}.INP`), path.join(config.OJFormatFolder, `${i + 1}.INP`))
                 else console.log(`Cant find ${filename}.INP in case ${i + 1}`)
-                
+
                 if (config.MainCPP)
-                    if (fs.existsSync(join(path, `${filename}.OUT`))) fs.copyFileSync(join(path, `${filename}.OUT`), join(config.OJFormatFolder, `${i + 1}.OUT`))
+                    if (fs.existsSync(path.join(path_, `${filename}.OUT`))) fs.copyFileSync(path.join(path_, `${filename}.OUT`), path.join(config.OJFormatFolder, `${i + 1}.OUT`))
                     else console.log(`Cant find ${filename}.OUT in case ${i + 1}`)
             }
+            
             resolve()
         })
     })
@@ -95,29 +96,40 @@ async function run() {
 
     if (config.ZipFile) {
         process.stdout.write(`Zipping TestCase... `)
-        await zip(join(resolve(), config.TestFolder), config.ZipFile)
+        await zip(path.join(path.resolve(), config.TestFolder), config.ZipFile)
         console.log('DONE')
     }
     if (config.OJZipFile && config.OJFormatFolder) {
         process.stdout.write(`Zipping OJ TestCase... `)
-        await zip(join(resolve(), config.OJFormatFolder), config.OJZipFile)
+        await zip(path.join(path.resolve(), config.OJFormatFolder), config.OJZipFile)
         console.log('DONE')
     }
 }
 
-function promiseExce(command: string, option: ExecOptions = {}, writeTo?: fs.PathLike | boolean): Promise<void> {
+function promiseExce(command: string, option: child.ExecOptions = {}, writeTo?: fs.PathLike | boolean): Promise<void> {
     return new Promise((res, reject) => {
         const stream = writeTo == false ? { write: () => { } } : writeTo ? fs.createWriteStream(writeTo as string, { encoding: 'utf8' }) : { write: console.log }
         function resolve(): void {
             if (writeTo) (stream as any).close();
             res();
         }
-        const child = exec(command, option)
-        child.stdout?.on('data', (data) => void stream.write(`[LOG] ${data.toString()}\n`))
-        child.stderr?.on('data', (data) => void stream.write(`[ERR] ${data.toString()}\n`))
-        child.on('error', reject)
-        child.on('close', async (code) => resolve())
+        const child_ = child.exec(command, option)
+        child_.stdout?.on('data', (data) => void stream.write(`[LOG] ${data.toString()}\n`))
+        child_.stderr?.on('data', (data) => void stream.write(`[ERR] ${data.toString()}\n`))
+        child_.on('error', reject)
+        child_.on('close', async (code) => resolve())
 
+    })
+}
+function promiseWrite(file: fs.PathLike, data: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const stream = fs.createWriteStream(file, { encoding: 'utf8' })
+        stream.write(data)
+        stream.on('error', reject)
+        stream.on('drain', () => {
+            stream.close()
+            resolve()
+        })
     })
 }
 
@@ -145,14 +157,13 @@ function zip(sourceDir: string, outPath: string): Promise<void> {
                 resolve()
                 break;
             case 'package':
-                if (runtime == 'bun') throw new Error(`Bun runtime is not supported for zip file using package`)
+                if (runtime == 'bun') throw new Error(`Bun runtime is not supported for zipping file using package`)
                 await zipDirectory(sourceDir, outPath)
                 resolve()
                 break;
         }
     })
 }
-
 function zipDirectory(sourceDir: string, outPath: string): Promise<void> {
     const archive = archiver('zip', { zlib: { level: 9 } });
     const stream = fs.createWriteStream(outPath);
@@ -160,7 +171,7 @@ function zipDirectory(sourceDir: string, outPath: string): Promise<void> {
     return new Promise((resolve, reject) => {
         archive
             .directory(sourceDir, false)
-            .on('error', err => reject(err))
+            .on('error', reject)
             .pipe(stream);
 
         archive.on('close', () => resolve());

@@ -155,7 +155,7 @@ export class GenerateTest {
 
                                 let range: any[] = dataSet.range
                                 range = Array.isArray(range[0]) ? range[defined.findIndex((def) => def.keyword == cmd)] : range
-                                
+
                                 const const_: boolean = cmd_.includes('const'),
                                     ghost: boolean = cmd_.includes('ghost'),
                                     var_ = this.parseCMD(cmd, range as any, defined, const_arr, ind)
@@ -170,7 +170,7 @@ export class GenerateTest {
                     if (line_.length != 0) line.push(line_)
                     if (line.length == 0) continue
                     prePush.push(...line)
-                    if (config?.logMem == true) console.log(`Testcase: ${i} | Memory usage: ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(5)} / ${(process.memoryUsage().heapTotal / 1024 / 1024).toFixed(5)} (MB)`)
+                    if (config?.logMem == true) console.log(`Testcase: ${i + 1} | Memory usage: ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(5)} / ${(process.memoryUsage().heapTotal / 1024 / 1024).toFixed(5)} (MB)`)
                 }
                 resolve()
             })
@@ -182,6 +182,7 @@ export class GenerateTest {
                 else { prePush = []; await func(); test_ = this.parseTest2D(prePush, join) };
             }
             if (config?.pushTest == true) test.push(prePush)
+            else prePush = [];
             if (config?.func)
                 await Promise.resolve(config.func(i, test_))
 
