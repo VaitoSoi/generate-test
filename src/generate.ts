@@ -64,7 +64,6 @@ async function run() {
         logMem: config.LogMemory as boolean || false,
         config: config.Config,
         func: (i, data) => new Promise(async (resolve) => {
-            // console.log(config)
             const path_ = path.join(config.TestFolder, `CASE_${i + 1}`), filename = config.IOFile
             if (!fs.existsSync(path_)) fs.mkdirSync(path_)
 
@@ -87,7 +86,7 @@ async function run() {
                     if (fs.existsSync(path.join(path_, `${filename}.OUT`))) fs.copyFileSync(path.join(path_, `${filename}.OUT`), path.join(config.OJFormatFolder, `${i + 1}.OUT`))
                     else console.log(`Cant find ${filename}.OUT in case ${i + 1}`)
             }
-            
+
             resolve()
         })
     })

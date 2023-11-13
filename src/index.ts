@@ -1,4 +1,5 @@
 import process from "node:process";
+import _ from 'lodash'
 
 export type Awaitable<T> = T | PromiseLike<T>
 export type Executable<Param extends any[] = [], Callback extends any = void> = (...args: Param) => Awaitable<Callback>
@@ -121,7 +122,7 @@ export class GenerateTest {
                                 else throw new Error(`wrong const data type at line ${ind}`)
                         })()
                         for (let i = 0; i < it; i++) promise.push(
-                            new Promise<void>((resolve) => {
+                            new Promise<void>(async (resolve) => {
                                 let line_: DataType_[] = []
                                 let promise: Promise<void>[] = []
                                 const it_ = (type == 1 ? ((): number => {
@@ -149,8 +150,15 @@ export class GenerateTest {
                                                 const findItem = findFunc(item[2])
                                                 cmd_ = `[${findItem ? (it_ - j + 1) / it_ * Number(findItem.value) : item[2]} - ${lastItem}]`
                                             }
+
+                                            const const_: boolean = cmd_.includes('const'),
+                                                ghost: boolean = cmd_.includes('ghost')
+
                                             lastItem = this.parseCMD(cmd_, range as any, defined, const_arr, { line: ind })
-                                            line_.push(lastItem)
+                                            if (const_ == true) const_arr.push({ keyword: this.parseKeywrord(cmd_), value: lastItem })
+                                            if (ghost == false) line_.push(lastItem)
+                                            // console.log({ lastItem, const_, ghost, line_ })
+
                                             resolve()
                                         }))
                                         resolve(void await Promise.all(promises))
@@ -275,10 +283,11 @@ export class GenerateTest {
             ? (rangeReg.exec(keyword) || seqReg.exec(keyword) || [])[2]
             : constReg.test(keyword)
                 ? (constReg.exec(keyword) as string[])[1]
-                : keyword
+                : keyword.split(' ').pop() || keyword
     }
     private parseCMD(cmd: string, range: TestConfigRange, defined: DefinedType[], const_arr: ConstantArray[], debug?: { line?: number | string, lastItem?: number }): DataType_ {
-        const findFunc = (val: string) => const_arr.find(def => def.keyword == val)
+        const findFunc = (val: string) => _.findLast(const_arr, (def) => def.keyword == val)
+
         const constReg = /\[(.+)\]/,
             rangeReg = /\[(.+) - (.+)\]/
         let line_: DataType_ = ''
