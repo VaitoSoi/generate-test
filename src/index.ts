@@ -172,12 +172,13 @@ export class GenerateTest {
                                     const type = exec[1].split(' '),
                                         const_ = type.includes('const'),
                                         ghost = type.includes('ghost'),
-                                        cmd = exec[2]
+                                        name = exec[2],
+                                        cmd = exec[3]
                                     let range: any[] = dataSet.range
-                                    range = Array.isArray(range[0]) ? range[defined.findIndex((def) => def.keyword == cmd)] : range
-                                    const value = this.parseCMD(exec[3], range as any, defined, const_arr, { line: ind })
+                                    range = Array.isArray(range[0]) ? range[defined.findIndex((def) => def.keyword == this.parseKeywrord(cmd))] : range
+                                    const value = this.parseCMD(cmd, range as any, defined, const_arr, { line: ind })
 
-                                    if (const_ == true) const_arr.push({ keyword: cmd, value: value })
+                                    if (const_ == true) const_arr.push({ keyword: name, value: value })
                                     if (ghost != true) line_.push(value)
                                 } else {
                                     const cmd_ = cmds[index].split(' '),
