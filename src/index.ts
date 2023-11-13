@@ -61,7 +61,8 @@ export class GenerateTest {
             arrayReg_2 = /^\[(.+), (.+) - (.+), "(.+)"\]$/,
             arrayReg_3 = /^\[(.+), (.+) - (.+), ""\]$/,
             seqReg = /^\[(.+) -> (.+)\]/,
-            assignReg = /^const (.+) = (.+)$/
+            reSegReg = /^\[(.+) <- (.+)\]/,
+            assignReg = /^(.+) (.+) = (.+)$/
         let defined: DefinedType[] = [],
             test: DataType_[][][] = [];
         for (let i in declares) {
@@ -130,7 +131,7 @@ export class GenerateTest {
                                         if (typeof find.value == 'number') return find.value
                                         else throw new Error(`wrong const data type at line ${ind}`)
                                 })() : 1)
-                                let lastItem: any[] = [];
+                                let lastItem: any;
                                 for (let j = 0; j < it_; j++) promise.push(
                                     new Promise<void>(async (resolve) => {
                                         const cmd = exec[1].split('; ')
@@ -140,12 +141,16 @@ export class GenerateTest {
                                             const item = cmd[k].slice(1, -1).split(' ')
                                             range = Array.isArray(range[0]) ? range[defined.findIndex((def) => def.keyword == this.parseKeywrord(cmd[k]))] : range
                                             if (seqReg.test(cmd[k])) {
-                                                if (!lastItem[k]) lastItem[k] = item[0]
+                                                if (!lastItem) lastItem = item[0]
                                                 const findItem = findFunc(item[2])
                                                 cmd_ = `[${lastItem} - ${findItem ? (1.5 * j) / it_ * Number(findItem.value) : item[2]}]`
+                                            } else if (reSegReg.test(cmd[k])) {
+                                                if (!lastItem) lastItem = item[2]
+                                                const findItem = findFunc(item[2])
+                                                cmd_ = `[${findItem ? (it_ - j + 1) / it_ * Number(findItem.value) : item[2]} - ${lastItem}]`
                                             }
-                                            lastItem[k] = this.parseCMD(cmd_, range as any, defined, const_arr, { line: ind })
-                                            line_.push(lastItem[k])
+                                            lastItem = this.parseCMD(cmd_, range as any, defined, const_arr, { line: ind })
+                                            line_.push(lastItem)
                                             resolve()
                                         }))
                                         resolve(void await Promise.all(promises))
@@ -164,13 +169,16 @@ export class GenerateTest {
                                     const exec = assignReg.exec(cmds[index])
                                     if (!exec) throw new Error('unknown format')
 
-                                    const cmd = exec[1]
+                                    const type = exec[1].split(' '),
+                                        const_ = type.includes('const'),
+                                        ghost = type.includes('ghost'),
+                                        cmd = exec[2]
                                     let range: any[] = dataSet.range
                                     range = Array.isArray(range[0]) ? range[defined.findIndex((def) => def.keyword == cmd)] : range
-                                    const value = this.parseCMD(exec[2], range as any, defined, const_arr, { line: ind })
+                                    const value = this.parseCMD(exec[3], range as any, defined, const_arr, { line: ind })
 
-                                    const_arr.push({ keyword: cmd, value })
-                                    line_.push(value)
+                                    if (const_ == true) const_arr.push({ keyword: cmd, value: value })
+                                    if (ghost != true) line_.push(value)
                                 } else {
                                     const cmd_ = cmds[index].split(' '),
                                         cmd = cmd_[cmd_.length - 1]
@@ -208,7 +216,7 @@ export class GenerateTest {
                         const_arr = []
                         prePush = []
                         join = ' ';
-                        await func(); 
+                        await func();
                         test_ = this.parseTest2D(prePush, join)
                     };
                 }
