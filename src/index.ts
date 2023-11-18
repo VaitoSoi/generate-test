@@ -144,7 +144,7 @@ export class GenerateTest {
                                             if (seqReg.test(cmd[k])) {
                                                 if (!lastItem) lastItem = item[0]
                                                 const findItem = findFunc(item[2])
-                                                cmd_ = `[${lastItem} - ${findItem ? (1.5 * j) / it_ * Number(findItem.value) : item[2]}]`
+                                                cmd_ = `[${lastItem} - ${findItem ? j / it_ * Number(findItem.value) : item[2]}]`
                                             } else if (reSegReg.test(cmd[k])) {
                                                 if (!lastItem) lastItem = item[2]
                                                 const findItem = findFunc(item[2])
