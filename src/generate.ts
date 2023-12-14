@@ -25,6 +25,7 @@ if (
 
 const runtime = process.argv.map(val => typeof val === 'string' ? val : (val as () => string)())[0].split('/').pop()
 if (runtime == 'bun') console.warn(`[WARN] Bun runtime detected !!`)
+const mainFile = os.type() == 'Windows_NT' ? 'main.exe' : 'main'
 
 const gt = new GenerateTest({
     testCount: config.Count,
@@ -40,6 +41,7 @@ async function run() {
         subfolder += `${folder[i]}/`
         if (!fs.existsSync(subfolder)) fs.mkdirSync(subfolder)
     }
+
     const folders = fs.readdirSync(path.join(config.TestFolder)).filter((dir) => fs.lstatSync(path.join(config.TestFolder, dir)).isDirectory())
     for (let i in folders) fs.rmSync(path.join(config.TestFolder, folders[i]), { recursive: true, force: true })
 
@@ -50,6 +52,7 @@ async function run() {
             subfolder += `${folder[i]}/`
             if (!fs.existsSync(subfolder)) fs.mkdirSync(subfolder)
         }
+
         const files = fs.readdirSync(path.join(config.OJFormatFolder)).filter((file) => fs.lstatSync(path.join(config.OJFormatFolder, file)).isFile())
         for (let i in files) fs.unlinkSync(path.join(config.OJFormatFolder, files[i]))
     }
@@ -70,10 +73,10 @@ async function run() {
             fs.writeFileSync(path.join(path_, `${filename}.INP`), data)
 
             if (config.MainCPP) {
-                fs.copyFileSync(path.join(...mainCPP, 'main'), path.join(path_, 'main'))
+                fs.copyFileSync(path.join(...mainCPP, mainFile), path.join(path_, mainFile))
 
                 if (config.TimeMeasure) console.time(`testcase_${i + 1}`)
-                child.execSync('./main', { cwd: path_ })
+                child.execSync(mainFile, { cwd: path_ })
                 if (config.TimeMeasure) console.timeEnd(`testcase_${i + 1}`)
                 else console.log(`Done testcase ${i + 1}`)
             } else console.log(`Generated testcase ${i + 1}`)
@@ -120,23 +123,29 @@ function promiseExce(command: string, option: child.ExecOptions = {}, writeTo?: 
 
     })
 }
-function promiseWrite(file: fs.PathLike, data: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-        const stream = fs.createWriteStream(file, { encoding: 'utf8' })
-        stream.write(data)
-        stream.on('error', reject)
-        stream.on('drain', () => {
-            stream.close()
-            resolve()
-        })
-    })
-}
+// function promiseWrite(file: fs.PathLike, data: string): Promise<void> {
+//     return new Promise((resolve, reject) => {
+//         const stream = fs.createWriteStream(file, { encoding: 'utf8' })
+//         stream.write(data)
+//         stream.on('error', reject)
+//         stream.on('drain', () => {
+//             stream.close()
+//             resolve()
+//         })
+//     })
+// }
 
 function zip(sourceDir: string, outPath: string): Promise<void> {
     if (!sourceDir.endsWith('/')) sourceDir += '/'
     return new Promise(async (resolve) => {
         switch (config.ZipProgram) {
             default:
+                process.stdout.write('(WARNING: Using default zip program, package)')
+            case 'package':
+                if (runtime == 'bun') throw new Error(`Bun runtime is not supported for zipping file using package`)
+                await zipDirectory(sourceDir, outPath)
+                resolve()
+                break;
             case 'system':
                 switch (os.type()) {
                     case 'Linux':
@@ -153,11 +162,6 @@ function zip(sourceDir: string, outPath: string): Promise<void> {
                 break;
             case 'jar':
                 promiseExce(`jar -cMf ${outPath} -C ${sourceDir} ./`)
-                resolve()
-                break;
-            case 'package':
-                if (runtime == 'bun') throw new Error(`Bun runtime is not supported for zipping file using package`)
-                await zipDirectory(sourceDir, outPath)
                 resolve()
                 break;
         }

@@ -151,13 +151,45 @@ export class GenerateTest {
                                                 cmd_ = `[${findItem ? (it_ - j + 1) / it_ * Number(findItem.value) : item[2]} - ${lastItem}]`
                                             }
 
-                                            const const_: boolean = cmd_.includes('const'),
-                                                ghost: boolean = cmd_.includes('ghost')
+                                            // const const_: boolean = cmd_.includes('const'),
+                                            //     ghost: boolean = cmd_.includes('ghost'),
+                                            //     exec = assignReg.exec(cmd_) as string[]
 
-                                            lastItem = this.parseCMD(cmd_, range as any, defined, const_arr, { line: ind })
-                                            if (const_ == true) const_arr.push({ keyword: this.parseKeywrord(cmd_), value: lastItem })
-                                            if (ghost == false) line_.push(lastItem)
-                                            // console.log({ lastItem, const_, ghost, line_ })
+                                            // lastItem = this.parseCMD(cmd_, range as any, defined, const_arr, { line: ind })
+                                            // if (const_ == true) const_arr.push({ keyword: exec[2], value: lastItem })
+                                            // if (ghost == false) line_.push(lastItem)
+                                            // console.log({ lastItem, cmd_, line_, range, const_arr })
+                                            const command = cmd_
+                                            if (assignReg.test(cmd_)) {
+                                                const exec = assignReg.exec(cmd_)
+                                                if (!exec) throw new Error('unknown format')
+
+                                                const type = exec[1].split(' '),
+                                                    const_ = type.includes('const'),
+                                                    ghost = type.includes('ghost'),
+                                                    name = exec[2],
+                                                    cmd = exec[3]
+                                                let range: any[] = dataSet.range
+                                                range = Array.isArray(range[0]) ? range[defined.findIndex((def) => def.keyword == this.parseKeywrord(cmd))] : range
+                                                const value = this.parseCMD(cmd, range as any, defined, const_arr, { line: ind })
+
+                                                if (const_ == true) const_arr.push({ keyword: name, value: value })
+                                                if (ghost != true) line_.push(value)
+                                            } else {
+                                                const cmd_ = command.split(' '),
+                                                    cmd = cmd_[cmd_.length - 1]
+                                                if (command.trim() == '') resolve()
+
+                                                let range: any[] = dataSet.range
+                                                range = Array.isArray(range[0]) ? range[defined.findIndex((def) => def.keyword == cmd)] : range
+
+                                                const const_: boolean = cmd_.includes('const'),
+                                                    ghost: boolean = cmd_.includes('ghost')
+                                                lastItem = this.parseCMD(command, range as any, defined, const_arr, { line: ind })
+
+                                                if (const_ == true) const_arr.push({ keyword: cmd, value: lastItem })
+                                                if (ghost != true) line_.push(lastItem)
+                                            }
 
                                             resolve()
                                         }))
