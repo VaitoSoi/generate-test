@@ -70,7 +70,7 @@ async function run() {
         logMem: config.LogMemory as boolean || false,
         config: config.Config,
         func: (i, data) => new Promise(async (resolve) => {
-            const path_ = path.join(config.TestFolder, `CASE_${i + 1}`), filename = config.IOFile
+            const path_ = path.join(__dirname, '..', config.TestFolder, `CASE_${i + 1}`), filename = config.IOFile
             if (!fs.existsSync(path_)) fs.mkdirSync(path_)
 
             fs.writeFileSync(path.join(path_, `${filename}.INP`), data)
