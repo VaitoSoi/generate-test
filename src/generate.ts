@@ -79,7 +79,7 @@ async function run() {
                 fs.copyFileSync(path.join(...mainCPP, mainFile), path.join(path_, mainFile))
 
                 if (config.TimeMeasure) console.time(`testcase_${i + 1}`)
-                child.execSync(mainFile, { cwd: path_ })
+                child.execSync(os.type() == 'Windows_NT' ? mainFile : `./${mainFile}`, { cwd: path_ })
                 if (config.TimeMeasure) console.timeEnd(`testcase_${i + 1}`)
                 else console.log(`Done testcase ${i + 1}`)
             } else console.log(`Generated testcase ${i + 1}`)
