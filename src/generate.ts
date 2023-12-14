@@ -25,7 +25,10 @@ if (
 
 const runtime = process.argv.map(val => typeof val === 'string' ? val : (val as () => string)())[0].split('/').pop()
 if (runtime == 'bun') console.warn(`[WARN] Bun runtime detected !!`)
-const mainFile = os.type() == 'Windows_NT' ? 'main.exe' : 'main'
+const mainFile =
+    os.type() == 'Windows_NT'
+        ? 'main.exe'
+        : 'main'
 
 const gt = new GenerateTest({
     testCount: config.Count,
@@ -59,7 +62,7 @@ async function run() {
     let mainCPP: string[] = []
     if (config.MainCPP) {
         mainCPP = config.MainCPP.split('/') as string[];
-        await promiseExce(`g++ ${mainCPP.pop()} -o main`, { cwd: path.join(...mainCPP) }, config.DebugFile == true ? path.join(...mainCPP, 'debug.log') : undefined)
+        await promiseExce(`g++ ${mainCPP.pop()} -std=${config.CPPVersion || 'c++17'} -o ${mainFile}`, { cwd: path.join(...mainCPP) }, config.DebugFile == true ? path.join(...mainCPP, 'debug.log') : undefined)
     }
 
     await gt.generate(config.Config as string, {
