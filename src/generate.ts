@@ -10,7 +10,7 @@ import os from 'node:os'
 const config = yaml.parse(fs.readFileSync(process.argv[2] || './config.yaml', 'utf8'))
 config.Range = config.Range.map((val: { range: number[], count: number, func?: string }) => {
     let output = val
-    if (!!output.func) output.func = require(path.join('..', output.func)).default
+    if (!!output.func) output.func = require(`../${output.func}`).default
     else output.func = undefined
     return output
 })
