@@ -88,6 +88,12 @@ class GenerateTest {
             });
             const commandLines = this.testCode.split('\n');
             for (let [index, config] of configs.entries()) {
+                if (!node_fs_1.default.existsSync(node_path_1.default.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`)))
+                    node_fs_1.default.mkdirSync(node_path_1.default.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`));
+                // const writeStream = fs.createWriteStream(
+                //     path.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`, `${this.IOFilename}.INP`),
+                //     { encoding: 'utf-8', flags: 'w' }
+                // )
                 let result = [];
                 while (true) {
                     result = [];
@@ -95,24 +101,28 @@ class GenerateTest {
                         const isArray = this.RegExp.arrayReg_1.test(line) ||
                             this.RegExp.arrayReg_2.test(line);
                         const range = Array.isArray(config.range[0]) ? config.range[ind] : config.range;
+                        // let writeCb: boolean;
                         if (isArray)
                             result.push(...this.parseArray(line, range));
+                        // writeCb = writeStream.write(this.parseArray(line, range).join(' ') + '\n')
                         else
-                            result.push(this.parseLine(line, range));
+                            result.push(this.parseLine(line, range).join(' '));
+                        // writeCb = writeStream.write(this.parseLine(line, range).join(' ') + '\n')
                     }
                     const func = config.func;
                     if (!func)
                         break;
                     else {
-                        const test = result.map(val => val.join(' ')).join('\n');
+                        const test = result.join('\n');
                         const res = yield Promise.resolve(func(test));
                         if (res == true)
                             break;
                     }
+                    console.log(`[REGENERATE] [TEST_${index}] Regenerating...`);
                 }
-                if (!node_fs_1.default.existsSync(node_path_1.default.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`)))
-                    node_fs_1.default.mkdirSync(node_path_1.default.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`));
-                node_fs_1.default.writeFileSync(node_path_1.default.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`, `${this.IOFilename}.INP`), result.map(val => val.join(' ')).join('\n'), { encoding: 'utf-8' });
+                node_fs_1.default.writeFileSync(node_path_1.default.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`, `${this.IOFilename}.INP`), result.join('\n'), { encoding: 'utf-8' });
+                if (global.gc)
+                    global.gc();
                 const usageRamRaw = node_process_1.default.memoryUsage();
                 const usageRam = {
                     heapUsed: (usageRamRaw.heapUsed / 1024 / 1024).toFixed(3),
@@ -123,6 +133,10 @@ class GenerateTest {
                 console.log(`[RAM_REPORT] [TEST_${index + 1}] V8: ${usageRam.heapUsed}/${usageRam.heapTotal} (MB) | C++: ${usageRam.external} (MB) | ArrayBuffers: ${usageRam.arrayBuffers} (MB)`);
             }
         });
+    }
+    endStream(writeableStream) {
+        // console.log('Called')
+        return new Promise((resolve) => writeableStream.end(() => resolve()));
     }
     parseCode(loadCode) {
         const [header, code] = loadCode.split(/-{5,}/);
@@ -158,13 +172,13 @@ class GenerateTest {
         const commands = array[1].split(' ');
         const [column, row] = (this.RegExp.arrayReg_2.test(command)
             ? [array[2], array[3]]
-            : [1, array[2]])
+            : [array[2], 1])
             .map((val) => this.cached.get(val.toString()) || val)
             .map(Number);
         for (let i = 0; i < column; i++) {
             const seq = this.RegExp.seqReg.test(command);
             const revSeq = this.RegExp.revSegReg.test(command);
-            let line = [];
+            let line = '';
             if (seq == true) {
                 const seqExec = this.RegExp.seqReg.exec(command) || [];
                 for (let j = 0; j < row; j++) {
@@ -172,7 +186,7 @@ class GenerateTest {
                     const end = this.cached.get(seqExec[2]) ? j / row * Number(this.cached.get(seqExec[2])) : Number(seqExec[2]);
                     const generated = this.parseCommand(`[${begin} - ${end}]`, testRange);
                     this.temp.lastItem = generated;
-                    line.push(generated);
+                    line = generated;
                 }
             }
             else if (revSeq == true) {
@@ -182,13 +196,13 @@ class GenerateTest {
                     const end = this.temp.lastItem || seqExec[1];
                     const generated = this.parseCommand(`[${begin} - ${end}]`, testRange);
                     this.temp.lastItem = generated;
-                    line.push(generated);
+                    line = generated;
                 }
             }
             else
                 for (let j = 0; j < row; j++)
                     for (let command of commands)
-                        line.push(...this.parseLine(command, testRange));
+                        line += this.parseLine(command, testRange) + ' ';
             result.push(line);
         }
         return result;

@@ -122,7 +122,14 @@ export class GenerateTest {
         const commandLines = this.testCode.split('\n')
 
         for (let [index, config] of configs.entries()) {
-            let result: string[][] = [];
+            if (!fs.existsSync(path.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`)))
+                fs.mkdirSync(path.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`))
+            // const writeStream = fs.createWriteStream(
+            //     path.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`, `${this.IOFilename}.INP`),
+            //     { encoding: 'utf-8', flags: 'w' }
+            // )
+
+            let result: string[] = [];
             while (true) {
                 result = [];
 
@@ -132,26 +139,32 @@ export class GenerateTest {
                         this.RegExp.arrayReg_2.test(line)
                     const range = Array.isArray(config.range[0]) ? (config.range as TestDataRange[])[ind] : config.range as TestDataRange
 
-                    if (isArray) result.push(...this.parseArray(line, range))
-                    else result.push(this.parseLine(line, range))
+                    // let writeCb: boolean;
+
+                    if (isArray)
+                        result.push(...this.parseArray(line, range))
+                        // writeCb = writeStream.write(this.parseArray(line, range).join(' ') + '\n')
+                    else
+                        result.push(this.parseLine(line, range).join(' '))
+                        // writeCb = writeStream.write(this.parseLine(line, range).join(' ') + '\n')
                 }
 
                 const func = config.func
                 if (!func) break
                 else {
-                    const test = result.map(val => val.join(' ')).join('\n')
+                    const test = result.join('\n')
                     const res = await Promise.resolve(func(test))
 
                     if (res == true) break;
                 }
+                console.log(`[REGENERATE] [TEST_${index}] Regenerating...`)
             }
-            if (!fs.existsSync(path.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`)))
-                fs.mkdirSync(path.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`))
             fs.writeFileSync(
                 path.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`, `${this.IOFilename}.INP`),
-                result.map(val => val.join(' ')).join('\n'),
+                result.join('\n'),
                 { encoding: 'utf-8' }
             )
+            if (global.gc) global.gc();
 
             const usageRamRaw = process.memoryUsage()
             const usageRam = {
@@ -164,6 +177,10 @@ export class GenerateTest {
         }
     }
 
+    private endStream(writeableStream: stream.Writable): Promise<void> { 
+        // console.log('Called')
+        return new Promise((resolve) => writeableStream.end(() => resolve())) 
+    }
     private parseCode(loadCode: string): void {
         const [header, code] = loadCode.split(/-{5,}/)
 
@@ -196,8 +213,8 @@ export class GenerateTest {
 
         return undefined;
     }
-    private parseArray(command: string, testRange: TestDataRange): string[][] {
-        let result: string[][] = [];
+    private parseArray(command: string, testRange: TestDataRange): string[] {
+        let result: string[] = [];
 
         const array =
             this.RegExp.arrayReg_2.exec(command) ||
@@ -208,7 +225,7 @@ export class GenerateTest {
             (
                 this.RegExp.arrayReg_2.test(command)
                     ? [array[2], array[3]]
-                    : [1, array[2]]
+                    : [array[2], 1]
             )
                 .map((val) => this.cached.get(val.toString()) || val)
                 .map(Number)
@@ -217,7 +234,7 @@ export class GenerateTest {
             const seq = this.RegExp.seqReg.test(command)
             const revSeq = this.RegExp.revSegReg.test(command)
 
-            let line: string[] = []
+            let line: string = ''
             if (seq == true) {
                 const seqExec = this.RegExp.seqReg.exec(command) || []
                 for (let j = 0; j < row; j++) {
@@ -225,7 +242,7 @@ export class GenerateTest {
                     const end = this.cached.get(seqExec[2]) ? j / row * Number(this.cached.get(seqExec[2])) : Number(seqExec[2]);
                     const generated = this.parseCommand(`[${begin} - ${end}]`, testRange);
                     this.temp.lastItem = generated;
-                    line.push(generated)
+                    line = generated;
                 }
             } else if (revSeq == true) {
                 const seqExec = this.RegExp.revSegReg.exec(command) || []
@@ -234,12 +251,12 @@ export class GenerateTest {
                     const end = this.temp.lastItem || seqExec[1];
                     const generated = this.parseCommand(`[${begin} - ${end}]`, testRange);
                     this.temp.lastItem = generated;
-                    line.push(generated)
+                    line = generated;
                 }
             } else
                 for (let j = 0; j < row; j++)
                     for (let command of commands)
-                        line.push(...this.parseLine(command, testRange))
+                        line += this.parseLine(command, testRange) + ' '
 
             result.push(line);
         }

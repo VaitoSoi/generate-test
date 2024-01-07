@@ -22,4 +22,6 @@ generate.setConfig({
     IOFilename: config.IOFilename,
     Zip_Program: config.Zip_Program,
 });
+console.time('generate');
 generate.generate();
+console.timeEnd('generate');

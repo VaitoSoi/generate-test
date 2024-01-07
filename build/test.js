@@ -1,12 +1,124 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
+const regexp = /\[RAM_REPORT\] \[TEST_(.+)\] V8: (.+)\/(.+) \(MB\) \| C\+\+: (.+) \(MB\) \| ArrayBuffers: (.+) \(MB\)/;
+let sum = {
+    hUsed: 0,
+    hTotal: 0,
+    cpp: 0,
+    array: 0,
 };
-Object.defineProperty(exports, "__esModule", { value: true });
-const node_fs_1 = __importDefault(require("node:fs"));
-const node_stream_1 = __importDefault(require("node:stream"));
-const writeableStream = new node_stream_1.default.Readable();
-const file1Stream = node_fs_1.default.createWriteStream(`${__dirname}/file1.txt`);
-const file2Stream = node_fs_1.default.createWriteStream(`${__dirname}/file2.txt`);
-writeableStream.pipe(file1Stream);
-writeableStream.pipe(file2Stream);
+const exec = `
+[RAM_REPORT] [TEST_1] V8: 39.518/66.000 (MB) | C++: 5.348 (MB) | ArrayBuffers: 3.598 (MB)
+[RAM_REPORT] [TEST_2] V8: 81.788/100.660 (MB) | C++: 6.270 (MB) | ArrayBuffers: 4.509 (MB)
+[RAM_REPORT] [TEST_3] V8: 15.846/51.316 (MB) | C++: 2.925 (MB) | ArrayBuffers: 1.164 (MB)
+[RAM_REPORT] [TEST_4] V8: 50.183/78.336 (MB) | C++: 5.697 (MB) | ArrayBuffers: 3.936 (MB)
+[RAM_REPORT] [TEST_5] V8: 47.890/75.910 (MB) | C++: 6.270 (MB) | ArrayBuffers: 4.509 (MB)
+[RAM_REPORT] [TEST_6] V8: 118.595/140.527 (MB) | C++: 10.137 (MB) | ArrayBuffers: 8.376 (MB)
+[RAM_REPORT] [TEST_7] V8: 60.571/98.133 (MB) | C++: 8.492 (MB) | ArrayBuffers: 6.731 (MB)
+[RAM_REPORT] [TEST_8] V8: 70.352/94.863 (MB) | C++: 2.976 (MB) | ArrayBuffers: 1.215 (MB)
+[RAM_REPORT] [TEST_9] V8: 72.989/94.863 (MB) | C++: 3.009 (MB) | ArrayBuffers: 1.248 (MB)
+[RAM_REPORT] [TEST_10] V8: 87.475/107.852 (MB) | C++: 3.464 (MB) | ArrayBuffers: 1.703 (MB)
+[RAM_REPORT] [TEST_11] V8: 93.132/120.484 (MB) | C++: 3.344 (MB) | ArrayBuffers: 1.583 (MB)
+[RAM_REPORT] [TEST_12] V8: 113.809/135.094 (MB) | C++: 3.706 (MB) | ArrayBuffers: 1.945 (MB)
+[RAM_REPORT] [TEST_13] V8: 156.804/185.414 (MB) | C++: 7.773 (MB) | ArrayBuffers: 6.012 (MB)
+[RAM_REPORT] [TEST_14] V8: 159.514/183.105 (MB) | C++: 2.218 (MB) | ArrayBuffers: 0.457 (MB)
+[RAM_REPORT] [TEST_15] V8: 162.274/183.105 (MB) | C++: 2.254 (MB) | ArrayBuffers: 0.493 (MB)
+[RAM_REPORT] [TEST_16] V8: 162.486/185.508 (MB) | C++: 2.120 (MB) | ArrayBuffers: 0.359 (MB)
+[RAM_REPORT] [TEST_17] V8: 218.812/242.309 (MB) | C++: 8.417 (MB) | ArrayBuffers: 6.656 (MB)
+[RAM_REPORT] [TEST_18] V8: 72.944/98.016 (MB) | C++: 9.125 (MB) | ArrayBuffers: 7.364 (MB)
+[RAM_REPORT] [TEST_19] V8: 68.233/97.453 (MB) | C++: 8.312 (MB) | ArrayBuffers: 6.551 (MB)
+[RAM_REPORT] [TEST_20] V8: 79.015/97.367 (MB) | C++: 3.479 (MB) | ArrayBuffers: 1.718 (MB)
+[RAM_REPORT] [TEST_21] V8: 79.059/99.016 (MB) | C++: 2.126 (MB) | ArrayBuffers: 0.365 (MB)
+[RAM_REPORT] [TEST_22] V8: 97.019/123.777 (MB) | C++: 4.639 (MB) | ArrayBuffers: 2.878 (MB)
+[RAM_REPORT] [TEST_23] V8: 97.178/123.777 (MB) | C++: 4.639 (MB) | ArrayBuffers: 2.878 (MB)
+[RAM_REPORT] [TEST_24] V8: 141.778/170.117 (MB) | C++: 7.477 (MB) | ArrayBuffers: 5.717 (MB)
+[RAM_REPORT] [TEST_25] V8: 135.983/167.742 (MB) | C++: 2.103 (MB) | ArrayBuffers: 0.342 (MB)
+[RAM_REPORT] [TEST_26] V8: 137.206/167.742 (MB) | C++: 2.118 (MB) | ArrayBuffers: 0.357 (MB)
+[RAM_REPORT] [TEST_27] V8: 150.839/170.680 (MB) | C++: 2.290 (MB) | ArrayBuffers: 0.529 (MB)
+[RAM_REPORT] [TEST_28] V8: 199.114/221.051 (MB) | C++: 7.660 (MB) | ArrayBuffers: 5.899 (MB)
+[RAM_REPORT] [TEST_29] V8: 208.060/242.398 (MB) | C++: 4.758 (MB) | ArrayBuffers: 2.997 (MB)
+[RAM_REPORT] [TEST_30] V8: 76.278/107.395 (MB) | C++: 10.487 (MB) | ArrayBuffers: 8.726 (MB)
+[RAM_REPORT] [TEST_31] V8: 79.423/111.016 (MB) | C++: 5.857 (MB) | ArrayBuffers: 4.096 (MB)
+[RAM_REPORT] [TEST_32] V8: 114.660/145.000 (MB) | C++: 8.842 (MB) | ArrayBuffers: 7.081 (MB)
+[RAM_REPORT] [TEST_33] V8: 62.718/85.008 (MB) | C++: 7.618 (MB) | ArrayBuffers: 5.857 (MB)
+[RAM_REPORT] [TEST_34] V8: 68.534/99.699 (MB) | C++: 4.061 (MB) | ArrayBuffers: 2.300 (MB)
+[RAM_REPORT] [TEST_35] V8: 91.375/122.867 (MB) | C++: 4.728 (MB) | ArrayBuffers: 2.967 (MB)
+[RAM_REPORT] [TEST_36] V8: 50.826/72.801 (MB) | C++: 6.160 (MB) | ArrayBuffers: 4.399 (MB)
+[RAM_REPORT] [TEST_37] V8: 50.196/78.199 (MB) | C++: 2.809 (MB) | ArrayBuffers: 1.049 (MB)
+[RAM_REPORT] [TEST_38] V8: 44.430/78.109 (MB) | C++: 6.221 (MB) | ArrayBuffers: 4.460 (MB)
+[RAM_REPORT] [TEST_39] V8: 65.759/94.379 (MB) | C++: 4.738 (MB) | ArrayBuffers: 2.977 (MB)
+[RAM_REPORT] [TEST_40] V8: 101.864/121.793 (MB) | C++: 5.403 (MB) | ArrayBuffers: 3.642 (MB)
+[RAM_REPORT] [TEST_41] V8: 124.086/156.191 (MB) | C++: 6.051 (MB) | ArrayBuffers: 4.290 (MB)
+[RAM_REPORT] [TEST_42] V8: 124.891/156.191 (MB) | C++: 6.062 (MB) | ArrayBuffers: 4.301 (MB)
+[RAM_REPORT] [TEST_43] V8: 128.991/153.688 (MB) | C++: 2.049 (MB) | ArrayBuffers: 0.288 (MB)
+[RAM_REPORT] [TEST_44] V8: 77.321/95.781 (MB) | C++: 8.890 (MB) | ArrayBuffers: 7.130 (MB)
+[RAM_REPORT] [TEST_45] V8: 58.641/89.910 (MB) | C++: 1.789 (MB) | ArrayBuffers: 0.028 (MB)
+[RAM_REPORT] [TEST_46] V8: 64.562/92.410 (MB) | C++: 2.019 (MB) | ArrayBuffers: 0.258 (MB)
+[RAM_REPORT] [TEST_47] V8: 64.978/92.410 (MB) | C++: 2.024 (MB) | ArrayBuffers: 0.263 (MB)
+[RAM_REPORT] [TEST_48] V8: 70.785/92.852 (MB) | C++: 2.214 (MB) | ArrayBuffers: 0.453 (MB)
+[RAM_REPORT] [TEST_49] V8: 97.674/119.563 (MB) | C++: 4.921 (MB) | ArrayBuffers: 3.160 (MB)
+[RAM_REPORT] [TEST_50] V8: 66.094/94.391 (MB) | C++: 8.752 (MB) | ArrayBuffers: 6.991 (MB)
+[RAM_REPORT] [TEST_51] V8: 75.123/98.773 (MB) | C++: 3.134 (MB) | ArrayBuffers: 1.373 (MB)
+[RAM_REPORT] [TEST_52] V8: 79.093/100.813 (MB) | C++: 2.172 (MB) | ArrayBuffers: 0.411 (MB)
+[RAM_REPORT] [TEST_53] V8: 94.912/112.941 (MB) | C++: 3.301 (MB) | ArrayBuffers: 1.540 (MB)
+[RAM_REPORT] [TEST_54] V8: 92.248/116.391 (MB) | C++: 2.253 (MB) | ArrayBuffers: 0.492 (MB)
+[RAM_REPORT] [TEST_55] V8: 147.056/173.293 (MB) | C++: 8.402 (MB) | ArrayBuffers: 6.641 (MB)
+[RAM_REPORT] [TEST_56] V8: 151.408/174.379 (MB) | C++: 2.740 (MB) | ArrayBuffers: 0.979 (MB)
+[RAM_REPORT] [TEST_57] V8: 163.054/183.066 (MB) | C++: 2.925 (MB) | ArrayBuffers: 1.164 (MB)
+[RAM_REPORT] [TEST_58] V8: 151.945/183.160 (MB) | C++: 1.810 (MB) | ArrayBuffers: 0.050 (MB)
+[RAM_REPORT] [TEST_59] V8: 167.589/194.273 (MB) | C++: 3.134 (MB) | ArrayBuffers: 1.373 (MB)
+[RAM_REPORT] [TEST_60] V8: 85.651/107.293 (MB) | C++: 10.154 (MB) | ArrayBuffers: 8.393 (MB)
+[RAM_REPORT] [TEST_61] V8: 30.668/55.789 (MB) | C++: 3.650 (MB) | ArrayBuffers: 1.889 (MB)
+[RAM_REPORT] [TEST_62] V8: 38.653/60.691 (MB) | C++: 3.053 (MB) | ArrayBuffers: 1.292 (MB)
+[RAM_REPORT] [TEST_63] V8: 63.719/84.188 (MB) | C++: 7.547 (MB) | ArrayBuffers: 5.786 (MB)
+[RAM_REPORT] [TEST_64] V8: 64.354/84.188 (MB) | C++: 7.555 (MB) | ArrayBuffers: 5.794 (MB)
+[RAM_REPORT] [TEST_65] V8: 74.566/96.125 (MB) | C++: 8.984 (MB) | ArrayBuffers: 7.223 (MB)
+[RAM_REPORT] [TEST_66] V8: 108.057/138.035 (MB) | C++: 7.394 (MB) | ArrayBuffers: 5.633 (MB)
+[RAM_REPORT] [TEST_67] V8: 138.025/167.488 (MB) | C++: 5.848 (MB) | ArrayBuffers: 4.087 (MB)
+[RAM_REPORT] [TEST_68] V8: 140.071/167.488 (MB) | C++: 5.875 (MB) | ArrayBuffers: 4.114 (MB)
+[RAM_REPORT] [TEST_69] V8: 155.303/177.648 (MB) | C++: 3.509 (MB) | ArrayBuffers: 1.748 (MB)
+[RAM_REPORT] [TEST_70] V8: 63.444/87.000 (MB) | C++: 7.859 (MB) | ArrayBuffers: 6.098 (MB)
+[RAM_REPORT] [TEST_71] V8: 103.639/132.020 (MB) | C++: 7.631 (MB) | ArrayBuffers: 5.870 (MB)
+[RAM_REPORT] [TEST_72] V8: 61.023/91.793 (MB) | C++: 8.402 (MB) | ArrayBuffers: 6.641 (MB)
+[RAM_REPORT] [TEST_73] V8: 84.908/110.688 (MB) | C++: 4.798 (MB) | ArrayBuffers: 3.038 (MB)
+[RAM_REPORT] [TEST_74] V8: 108.533/133.137 (MB) | C++: 4.748 (MB) | ArrayBuffers: 2.987 (MB)
+[RAM_REPORT] [TEST_75] V8: 106.620/136.336 (MB) | C++: 2.447 (MB) | ArrayBuffers: 0.686 (MB)
+[RAM_REPORT] [TEST_76] V8: 159.899/186.871 (MB) | C++: 7.731 (MB) | ArrayBuffers: 5.970 (MB)
+[RAM_REPORT] [TEST_77] V8: 21.590/52.727 (MB) | C++: 2.086 (MB) | ArrayBuffers: 0.325 (MB)
+[RAM_REPORT] [TEST_78] V8: 23.888/54.102 (MB) | C++: 3.463 (MB) | ArrayBuffers: 1.702 (MB)
+[RAM_REPORT] [TEST_79] V8: 69.569/92.176 (MB) | C++: 8.538 (MB) | ArrayBuffers: 6.777 (MB)
+[RAM_REPORT] [TEST_80] V8: 70.368/93.336 (MB) | C++: 2.695 (MB) | ArrayBuffers: 0.934 (MB)
+[RAM_REPORT] [TEST_81] V8: 72.134/93.336 (MB) | C++: 2.718 (MB) | ArrayBuffers: 0.957 (MB)
+[RAM_REPORT] [TEST_82] V8: 96.615/122.617 (MB) | C++: 5.228 (MB) | ArrayBuffers: 3.467 (MB)
+[RAM_REPORT] [TEST_83] V8: 124.831/151.359 (MB) | C++: 5.470 (MB) | ArrayBuffers: 3.709 (MB)
+[RAM_REPORT] [TEST_84] V8: 29.955/58.336 (MB) | C++: 3.195 (MB) | ArrayBuffers: 1.434 (MB)
+[RAM_REPORT] [TEST_85] V8: 36.434/58.168 (MB) | C++: 3.027 (MB) | ArrayBuffers: 1.266 (MB)
+[RAM_REPORT] [TEST_86] V8: 42.889/87.672 (MB) | C++: 6.283 (MB) | ArrayBuffers: 4.522 (MB)
+[RAM_REPORT] [TEST_87] V8: 50.190/87.672 (MB) | C++: 6.378 (MB) | ArrayBuffers: 4.617 (MB)
+[RAM_REPORT] [TEST_88] V8: 107.325/128.719 (MB) | C++: 8.828 (MB) | ArrayBuffers: 7.067 (MB)
+[RAM_REPORT] [TEST_89] V8: 104.541/126.465 (MB) | C++: 2.324 (MB) | ArrayBuffers: 0.563 (MB)
+[RAM_REPORT] [TEST_90] V8: 109.612/135.473 (MB) | C++: 2.833 (MB) | ArrayBuffers: 1.072 (MB)
+[RAM_REPORT] [TEST_91] V8: 109.249/140.582 (MB) | C++: 2.442 (MB) | ArrayBuffers: 0.681 (MB)
+[RAM_REPORT] [TEST_92] V8: 116.009/146.418 (MB) | C++: 2.530 (MB) | ArrayBuffers: 0.769 (MB)
+[RAM_REPORT] [TEST_93] V8: 119.326/147.383 (MB) | C++: 1.994 (MB) | ArrayBuffers: 0.233 (MB)
+[RAM_REPORT] [TEST_94] V8: 125.193/147.383 (MB) | C++: 2.071 (MB) | ArrayBuffers: 0.310 (MB)
+[RAM_REPORT] [TEST_95] V8: 128.030/147.383 (MB) | C++: 2.108 (MB) | ArrayBuffers: 0.347 (MB)
+[RAM_REPORT] [TEST_96] V8: 128.251/147.383 (MB) | C++: 2.108 (MB) | ArrayBuffers: 0.347 (MB)
+[RAM_REPORT] [TEST_97] V8: 80.363/106.109 (MB) | C++: 9.721 (MB) | ArrayBuffers: 7.960 (MB)
+[RAM_REPORT] [TEST_98] V8: 79.103/101.574 (MB) | C++: 2.684 (MB) | ArrayBuffers: 0.923 (MB)
+[RAM_REPORT] [TEST_99] V8: 93.451/124.324 (MB) | C++: 4.436 (MB) | ArrayBuffers: 2.675 (MB)
+[RAM_REPORT] [TEST_100] V8: 119.105/150.238 (MB) | C++: 5.099 (MB) | ArrayBuffers: 3.339 (MB)
+`.split('\n')
+    .map(str => regexp.exec(str) || [])
+    .filter(val => val.length != 0)
+    .forEach(val => {
+    sum.hUsed += Number(val[2]);
+    sum.hTotal += Number(val[3]);
+    sum.cpp += Number(val[4]);
+    sum.array += Number(val[5]);
+});
+console.log({
+    hUsed: (sum.hUsed / 100).toFixed(3),
+    hTotal: (sum.hTotal / 100).toFixed(3),
+    cpp: (sum.cpp / 100).toFixed(3),
+    array: (sum.array / 100).toFixed(3),
+});
