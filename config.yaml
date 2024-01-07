@@ -1,19 +1,20 @@
-MainCPP: file/main.cpp
-IOFile: TEST
-Count: 10
-Range: [
-
+TestCount: 5
+TestRange: [
+    { range: [0, 1], count: 10 }
 ]
-Config: |
-  n number 1 1000
-  ------
-  n
-TestFolder: file/testcases/
-OJFormatFolder: file/test_oj/
-ZipFile: file/testcase.zip
-OJZipFile: file/test_oj.zip
-DebugFile: true
-LogMemory: true
-TimeMeasure: true
+TestCode: |
+    n number 1 100
+    ------
+    const n
+    [n, 1 - n]
 
-# Xem thêm ở file README.md
+MainCodePath: 
+TestcasesPath: file/testcases
+TestcasesZip:
+OJ_TestcasesPath:
+OJ_TestcasesZip:
+
+IOFilename: TEST
+Compiler: g++
+CppVersion: c++17
+Zip_Program: package
