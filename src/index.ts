@@ -220,7 +220,7 @@ export class GenerateTest {
             this.RegExp.arrayReg_2.exec(command) ||
             this.RegExp.arrayReg_1.exec(command) ||
             [];
-        const commands: string[] = array[1].split(' ');
+        const commands: string[] = array[1].split('; ');
         const [column, row] =
             (
                 this.RegExp.arrayReg_2.test(command)
