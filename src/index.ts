@@ -2,8 +2,13 @@ import process from "node:process";
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from "node:path";
-import stream from "node:stream";
+import os from 'node:os'
+import child_process from 'node:child_process';
+import stream from 'node:stream'
 import _ from 'lodash';
+import ms from 'ms'
+import archiver from "archiver";
+import package_json from "../package.json"
 
 export type Awaitable<T> = T | PromiseLike<T>
 export type Executable<Param extends any[] = [], Callback extends any = void> = (...args: Param) => Awaitable<Callback>
@@ -35,16 +40,21 @@ export interface GTOptions {
     TestCount: number;
     TestRange: TestRange[];
 
+    IOFilename: string;
     TestCode: string;
-    MainCodePath?: string;
-    Compiler?: string;
-    CppVersion?: string;
+    MainCodePath: string | null;
+    Compiler: string | null;
+    CppVersion: string | null;
     TestcasesPath: string;
-    OJ_TestcasesPath?: string;
-    TestcasesZip?: string;
-    OJ_TestcasesZip?: string;
-    IOFilename?: string;
-    Zip_Program?: string;
+    OJ_TestcasesPath: string | null;
+    TestcasesZipPath: string | null;
+    OJ_TestcasesZipPath: string | null;
+    Zip_Program: string | null;
+}
+export interface ReportArray {
+    id: number;
+    memoryUsage: NodeJS.MemoryUsage;
+    time: number;
 }
 
 export class GenerateTest {
@@ -52,15 +62,13 @@ export class GenerateTest {
     private testRange: TestRange[] = [];
     private testCode: string = '';
 
-    private temp: any;
+    private temp: any = {};
     private RegExp = {
         arrayReg_1: /^\[(.+), (.+)\]$/,
         arrayReg_2: /^\[(.+), (.+) - (.+)\]$/,
-        seqReg: /^\[(.+) -> (.+)\]/,
+        seqReg: /^\[(.+) -> (.+)\]$/,
         revSegReg: /^\[(.+) <- (.+)\]/,
-        assignReg: /^(.+) = (.+)$/,
-        getCachedReg: /\[(.+)\]/,
-        getRangeReg: /\[(.+) - (.+)\]/,
+        assignReg: /^const (.+) = (.+)$/,
         constReg: /\[(.+)\]/,
         rangeReg: /\[(.+) - (.+)\]/,
         valueReg: /{(.+)}/,
@@ -68,15 +76,15 @@ export class GenerateTest {
     private cached: Map<string, DataType> = new Map();
     private defineVar: Map<string, DefineVariable> = new Map();
 
-    private MainCodePath?: string = '';
+    private MainCodePath: string | null = null;
     private IOFilename: string = '';
-    private Compiler: string = '';
-    private CppVersion: string = '';
+    private Compiler: string | null = null;
+    private CppVersion: string | null = null;
     private TestcasesPath: string = '';
-    private OJ_TestcasesPath?: string = '';
-    private TestcasesZip?: string = '';
-    private OJ_TestcasesZip?: string = '';
-    private Zip_Program: string = '';
+    private OJ_TestcasesPath?: string | null = null;
+    private TestcasesZipPath?: string | null = null;
+    private OJ_TestcasesZipPath?: string | null = null;
+    private Zip_Program: string | null = null;
 
     constructor(config?: GTOptions) {
         if (config) this.setConfig(config);
@@ -93,16 +101,17 @@ export class GenerateTest {
         this.parseCode(config.TestCode)
 
         this.MainCodePath = config.MainCodePath
-        this.IOFilename = config.IOFilename || 'TEST'
+        this.IOFilename = config.IOFilename
         this.Compiler = config.Compiler || 'g++'
         this.CppVersion = config.CppVersion || 'c++17'
         this.TestcasesPath = config.TestcasesPath
-        this.TestcasesZip = config.TestcasesZip
+        this.TestcasesZipPath = config.TestcasesZipPath
         this.OJ_TestcasesPath = config.OJ_TestcasesPath
-        this.OJ_TestcasesZip = config.OJ_TestcasesZip
-        this.Zip_Program = config.Zip_Program || 'package'
+        this.OJ_TestcasesZipPath = config.OJ_TestcasesZipPath
+        this.Zip_Program = config.Zip_Program
     }
-    public async generate(): Promise<void> {
+    public async generate(): Promise<ReportArray[]> {
+        let report: ReportArray[] = []
         const dirContents = fs.readdirSync(path.join(__dirname, '..', this.TestcasesPath))
         dirContents.forEach((val) => fs.rmSync(path.join(__dirname, '..', this.TestcasesPath, val), { recursive: true, force: true }))
 
@@ -122,6 +131,8 @@ export class GenerateTest {
         const commandLines = this.testCode.split('\n')
 
         for (let [index, config] of configs.entries()) {
+            this.temp = {}
+
             if (!fs.existsSync(path.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`)))
                 fs.mkdirSync(path.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`))
             // const writeStream = fs.createWriteStream(
@@ -130,6 +141,7 @@ export class GenerateTest {
             // )
 
             let result: string[] = [];
+            let timeStart = Date.now()
             while (true) {
                 result = [];
 
@@ -143,10 +155,10 @@ export class GenerateTest {
 
                     if (isArray)
                         result.push(...this.parseArray(line, range))
-                        // writeCb = writeStream.write(this.parseArray(line, range).join(' ') + '\n')
+                    // writeCb = writeStream.write(this.parseArray(line, range).join(' ') + '\n')
                     else
                         result.push(this.parseLine(line, range).join(' '))
-                        // writeCb = writeStream.write(this.parseLine(line, range).join(' ') + '\n')
+                    // writeCb = writeStream.write(this.parseLine(line, range).join(' ') + '\n')
                 }
 
                 const func = config.func
@@ -159,12 +171,12 @@ export class GenerateTest {
                 }
                 console.log(`[REGENERATE] [TEST_${index}] Regenerating...`)
             }
+            let time = Date.now() - timeStart;
             fs.writeFileSync(
                 path.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`, `${this.IOFilename}.INP`),
                 result.join('\n'),
                 { encoding: 'utf-8' }
             )
-            if (global.gc) global.gc();
 
             const usageRamRaw = process.memoryUsage()
             const usageRam = {
@@ -173,13 +185,160 @@ export class GenerateTest {
                 external: (usageRamRaw.external / 1024 / 1024).toFixed(3),
                 arrayBuffers: (usageRamRaw.arrayBuffers / 1024 / 1024).toFixed(3)
             }
-            console.log(`[RAM_REPORT] [TEST_${index + 1}] V8: ${usageRam.heapUsed}/${usageRam.heapTotal} (MB) | C++: ${usageRam.external} (MB) | ArrayBuffers: ${usageRam.arrayBuffers} (MB)`)
+            report.push({
+                id: index,
+                memoryUsage: usageRamRaw,
+                time
+            })
+            console.log(`[REPORT] [TEST_${index + 1}] Time: ${ms(time)} | V8: ${usageRam.heapUsed}/${usageRam.heapTotal} (MB) | C++: ${usageRam.external} (MB) | ArrayBuffers: ${usageRam.arrayBuffers} (MB)`)
+
+            if (global.gc) global.gc();
+        }
+
+        return report
+    }
+    public async runFile() {
+        if (!!this.OJ_TestcasesPath)
+            fs.readdirSync(this.OJ_TestcasesPath)
+                .forEach(file => fs.unlinkSync(path.join(this.OJ_TestcasesPath as string, file)))
+
+        if (!this.MainCodePath) throw new Error("MainCodePath is undefined")
+
+        const binaryFile =
+            os.platform() == 'win32'
+                ? 'main.exe'
+                : 'main.out'
+        const binaryFilePath =
+            os.platform() == 'win32'
+                ? 'main.exe'
+                : './main.out'
+        let paths = {
+            cwd: this.MainCodePath.split(/(\/|\\)/gi),
+            testcases: path.join(__dirname, '..', this.TestcasesPath),
+            testcasesZip: !!this.TestcasesZipPath ? path.join(__dirname, '..', this.TestcasesZipPath) : undefined,
+            oj: !!this.OJ_TestcasesPath ? path.join(__dirname, '..', this.OJ_TestcasesPath) : undefined,
+            ojZip: !!this.OJ_TestcasesZipPath ? path.join(__dirname, '..', this.OJ_TestcasesZipPath) : undefined,
+        }
+        const compileCommand = `${this.Compiler} -std=${this.CppVersion} -Wall -Wextra -Wpedantic -Wunused-variable -Wtype-limits -o ${binaryFile} ${paths.cwd.pop()}`
+
+
+        console.log(`[COMPILER] Compiling....`)
+        console.log(`\t----- Live logging from compiler ----`)
+        console.log(`> ${compileCommand}`)
+        const execCb = await this.exec(compileCommand, paths.cwd.join('/'), { stdout: process.stdout, stderr: process.stderr })
+        console.log(`\n\t-------------------------------------`)
+        if (execCb.code != 0) throw new Error(`compiler throw code ${execCb.code}`)
+
+        for (let index = 0; index < this.testCount; index++) {
+            const binaryPath = paths.cwd,
+                testcase = path.join(paths.testcases, `TEST_${index + 1}`),
+                oj = paths.oj
+
+            if (fs.existsSync(path.join(testcase, binaryFile))) fs.unlinkSync(path.join(testcase, binaryFile))
+            fs.copyFileSync(path.join(...binaryPath, binaryFile), path.join(testcase, binaryFile))
+
+            const startTime = Date.now();
+            const execCb = await this.exec(binaryFilePath, testcase);
+            const execTime = Date.now() - startTime;
+            if (execCb.code != 0) {
+                console.log(execCb.stdout)
+                console.log({ binaryPath, testcase })
+                throw new Error(`binary file throw code ${execCb.code} at test ${index + 1}`)
+            }
+
+            if (!fs.existsSync(path.join(testcase, `${this.IOFilename}.OUT`))) throw new Error(`cant find output file at test ${index + 1}`)
+            if (oj) {
+                fs.copyFileSync(path.join(testcase, `${this.IOFilename}.INP`), path.join(oj, `${this.IOFilename}_${index + 1}.INP`))
+                fs.copyFileSync(path.join(testcase, `${this.IOFilename}.OUT`), path.join(oj, `${this.IOFilename}_${index + 1}.OUT`))
+            }
+
+            console.log(`[EXEC_FILE] [TEST_${index + 1}] Time: ${ms(execTime)}`)
+        }
+
+        if (paths.testcasesZip) {
+            console.log(`[ZIPPER] Zipping testcases...`)
+            await this.zip(paths.testcases, paths.testcasesZip, this.Zip_Program)
+            console.log(`[ZIPPER] Done`)
+        }
+        if (paths.oj && paths.ojZip) {
+            console.log(`[ZIPPER] Zipping testcases (OJ format)...`)
+            await this.zip(paths.oj, paths.ojZip, this.Zip_Program)
+            console.log(`[ZIPPER] Done`)
         }
     }
 
-    private endStream(writeableStream: stream.Writable): Promise<void> { 
-        // console.log('Called')
-        return new Promise((resolve) => writeableStream.end(() => resolve())) 
+    private async zip(sourceDir: string, outPath: string, ZipProgram: string | null): Promise<void> {
+        switch (ZipProgram) {
+            default:
+                console.log(`[ZIPPER] WARNING: Using default zip program: package (archiver ${package_json.dependencies.archiver})`)
+            case 'package':
+                return await this.zipDirectory(sourceDir, outPath)
+                break;
+            case 'system':
+                switch (os.type()) {
+                    case 'Linux':
+                        await this.exec(`zip -r temp.zip .`, sourceDir)
+                        fs.copyFileSync(sourceDir + '/temp.zip', outPath)
+                        fs.rmSync(sourceDir + '/temp.zip')
+                        return undefined
+                        break;
+                    default:
+                        outPath = outPath.endsWith('.zip') ? outPath.slice(0, - '.zip'.length) : outPath
+                        return void await this.exec(`Compress-Archive -Path ${sourceDir} -DestinationPath ${outPath}`)
+                        break;
+                }
+                break;
+            case 'jar':
+                return void await this.exec(`jar -cMf ${outPath} -C ${sourceDir} ./`)
+                break;
+        }
+
+    }
+    private zipDirectory(sourceDir: string, outPath: string): Promise<void> {
+        const archive = archiver('zip', { zlib: { level: 9 } });
+        const stream = fs.createWriteStream(outPath);
+
+        return new Promise((resolve, reject) => {
+            archive.directory(sourceDir, false);
+            archive.on('error', (err) => { throw err });
+            archive.pipe(stream);
+
+            stream.on('close', () => resolve());
+            archive.finalize();
+        });
+    }
+    private spawn(command: string, cwd?: string, pipe?: { stdout?: stream.Writable, stderr?: stream.Writable }): Promise<{ code: number | null, stdout: string }> {
+        return new Promise((resolve, reject) => {
+            const compileCommand = command.split(' ')
+            const childSpawn = !!cwd ? child_process.spawn(compileCommand[0], compileCommand.slice(1), {
+                cwd,
+            }) : child_process.spawn(compileCommand[0], compileCommand.slice(1))
+            if (pipe?.stdout) childSpawn.stdout?.pipe(pipe.stdout)
+            if (pipe?.stderr) childSpawn.stdout?.pipe(pipe.stderr)
+
+            let stdout: string = ''
+            childSpawn.stdout.on('data', (chunk) => stdout += chunk + '\n')
+            childSpawn.stderr.on('data', (chunk) => stdout += chunk + '\n')
+
+            childSpawn.on('error', (err) => { throw err })
+            childSpawn.on('close', (code) => resolve({ code, stdout }))
+        })
+    }
+    private exec(command: string, cwd?: string, pipe?: { stdout?: stream.Writable, stderr?: stream.Writable }): Promise<{ code: number | null, stdout: string }> {
+        return new Promise((resolve, reject) => {
+            const childExec = !!cwd ? child_process.exec(command, {
+                cwd,
+            }) : child_process.exec(command)
+            if (pipe?.stdout) childExec.stdout?.pipe(pipe.stdout)
+            if (pipe?.stderr) childExec.stdout?.pipe(pipe.stderr)
+
+            let stdout: string = ''
+            childExec.stdout?.on('data', (chunk) => stdout += chunk + '\n')
+            childExec.stderr?.on('data', (chunk) => stdout += chunk + '\n')
+
+            childExec.on('error', (err) => { throw err })
+            childExec.on('close', (code) => resolve({ code, stdout }))
+        })
     }
     private parseCode(loadCode: string): void {
         const [header, code] = loadCode.split(/-{5,}/)
@@ -216,42 +375,44 @@ export class GenerateTest {
     private parseArray(command: string, testRange: TestDataRange): string[] {
         let result: string[] = [];
 
-        const array =
+        const args =
             this.RegExp.arrayReg_2.exec(command) ||
             this.RegExp.arrayReg_1.exec(command) ||
             [];
-        const commands: string[] = array[1].split('; ');
+        const commands: string[] = args[1].split('; ');
         const [column, row] =
             (
                 this.RegExp.arrayReg_2.test(command)
-                    ? [array[2], array[3]]
-                    : [array[2], 1]
+                    ? [args[2], args[3]]
+                    : [args[2], 1]
             )
                 .map((val) => this.cached.get(val.toString()) || val)
                 .map(Number)
 
         for (let i = 0; i < column; i++) {
-            const seq = this.RegExp.seqReg.test(command)
-            const revSeq = this.RegExp.revSegReg.test(command)
+            const seq = this.RegExp.seqReg.test(args[1])
+            const revSeq = this.RegExp.revSegReg.test(args[1])
 
             let line: string = ''
             if (seq == true) {
-                const seqExec = this.RegExp.seqReg.exec(command) || []
+                const seqExec = this.RegExp.seqReg.exec(args[1]) || []
                 for (let j = 0; j < row; j++) {
                     const begin = this.temp.lastItem || seqExec[1];
-                    const end = this.cached.get(seqExec[2]) ? j / row * Number(this.cached.get(seqExec[2])) : Number(seqExec[2]);
+                    const end = this.cached.get(seqExec[2]) ? (j + 1) / row * Number(this.cached.get(seqExec[2])) : seqExec[2];
+                    console.log({ begin, end, cache: this.cached })
                     const generated = this.parseCommand(`[${begin} - ${end}]`, testRange);
                     this.temp.lastItem = generated;
-                    line = generated;
+                    line += generated + ' ';
                 }
             } else if (revSeq == true) {
-                const seqExec = this.RegExp.revSegReg.exec(command) || []
+                const seqExec = this.RegExp.revSegReg.exec(args[1]) || []
                 for (let j = 0; j < row; j++) {
-                    const begin = this.cached.get(seqExec[2]) ? (row - j + 1) / row * Number(this.cached.get(seqExec[2])) : Number(seqExec[2]);
-                    const end = this.temp.lastItem || seqExec[1];
+                    const begin = this.cached.get(seqExec[2]) ? (row - j + 1) / row * Number(this.cached.get(seqExec[2])) : seqExec[2];
+                    const end = this.temp.lastItem || seqExec[2];
+                    console.log({ begin, end, cache: this.cached })
                     const generated = this.parseCommand(`[${begin} - ${end}]`, testRange);
                     this.temp.lastItem = generated;
-                    line = generated;
+                    line += generated + ' ';
                 }
             } else
                 for (let j = 0; j < row; j++)
@@ -272,22 +433,36 @@ export class GenerateTest {
 
         return result;
     }
-    private parseCommand(fullCommand: string, testRange: TestDataRange): string {
+    public parseCommand(fullCommand: string, testRange: TestDataRange): string {
+        // console.log({ fullCommand, testRange })
+
         fullCommand = fullCommand.trim();
         if (fullCommand == '') return '';
 
-        if (this.RegExp.constReg.test(fullCommand)) {
-            const keyword = (this.RegExp.constReg.exec(fullCommand) || [])[1];
-            return this.cached.get(keyword)?.toString() || '';
-        } else if (this.RegExp.valueReg.test(fullCommand)) {
-            const keyword = (this.RegExp.valueReg.exec(fullCommand) || [])[1];
-            return eval(keyword) || '';
+        if (this.RegExp.assignReg.test(fullCommand)) {
+            const assignExec = this.RegExp.assignReg.exec(fullCommand) || [];
+            const keyword = assignExec[1];
+            const command = assignExec[2];
+
+            const generate = this.parseCommand(command, testRange);
+
+            this.cached.set(keyword, generate)
+
+            return generate
+
         } else if (this.RegExp.rangeReg.test(fullCommand)) {
             const line = this.RegExp.rangeReg.exec(fullCommand) || [];
 
             const [start, end] = [this.cached.get(line[1]) || line[1], this.cached.get(line[2]) || line[2]].map(Number)
+            // console.log({ start, end })
 
             return this.getRandomInt(start, end).toString();
+        } else if (this.RegExp.valueReg.test(fullCommand)) {
+            const keyword = (this.RegExp.valueReg.exec(fullCommand) || [])[1];
+            return eval(keyword) || '';
+        } else if (this.RegExp.constReg.test(fullCommand)) {
+            const keyword = (this.RegExp.constReg.exec(fullCommand) || [])[1];
+            return this.cached.get(keyword)?.toString() || '';
         } else {
             let command = fullCommand.split(' ');
 
@@ -319,8 +494,9 @@ export class GenerateTest {
 
     public getRandomInt(min: number, max: number): number {
         min = Math.floor(min);
-        max = Math.floor(max);
-        return crypto.randomInt(min, max);
+        max = Math.ceil(max);
+        if (min == max) return min
+        else return crypto.randomInt(min, max);
     }
     public getRandomCharacter(str: string): string {
         return str[crypto.randomInt(0, str.length - 1)];

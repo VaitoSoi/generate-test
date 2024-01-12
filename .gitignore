@@ -127,9 +127,12 @@ dist
 .pnp.*
 
 # test folder
-test.ts
-main*
-.vscode/settings.json
+file/
+test/
 
 # test thing
-file/
+test*
+main*
+
+# etc
+.vscode/settings.json

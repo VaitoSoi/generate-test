@@ -17,6 +17,9 @@ const node_process_1 = __importDefault(require("node:process"));
 const node_crypto_1 = __importDefault(require("node:crypto"));
 const node_fs_1 = __importDefault(require("node:fs"));
 const node_path_1 = __importDefault(require("node:path"));
+const node_os_1 = __importDefault(require("node:os"));
+const node_child_process_1 = __importDefault(require("node:child_process"));
+const ms_1 = __importDefault(require("ms"));
 class GenerateTest {
     constructor(config) {
         this.testCount = 0;
@@ -36,15 +39,15 @@ class GenerateTest {
         };
         this.cached = new Map();
         this.defineVar = new Map();
-        this.MainCodePath = '';
+        this.MainCodePath = null;
         this.IOFilename = '';
-        this.Compiler = '';
-        this.CppVersion = '';
+        this.Compiler = null;
+        this.CppVersion = null;
         this.TestcasesPath = '';
-        this.OJ_TestcasesPath = '';
-        this.TestcasesZip = '';
-        this.OJ_TestcasesZip = '';
-        this.Zip_Program = '';
+        this.OJ_TestcasesPath = null;
+        this.TestcasesZipPath = null;
+        this.OJ_TestcasesZipPath = null;
+        this.Zip_Program = null;
         if (config)
             this.setConfig(config);
     }
@@ -60,17 +63,18 @@ class GenerateTest {
         });
         this.parseCode(config.TestCode);
         this.MainCodePath = config.MainCodePath;
-        this.IOFilename = config.IOFilename || 'TEST';
+        this.IOFilename = config.IOFilename;
         this.Compiler = config.Compiler || 'g++';
         this.CppVersion = config.CppVersion || 'c++17';
         this.TestcasesPath = config.TestcasesPath;
-        this.TestcasesZip = config.TestcasesZip;
+        this.TestcasesZipPath = config.TestcasesZipPath;
         this.OJ_TestcasesPath = config.OJ_TestcasesPath;
-        this.OJ_TestcasesZip = config.OJ_TestcasesZip;
+        this.OJ_TestcasesZipPath = config.OJ_TestcasesZipPath;
         this.Zip_Program = config.Zip_Program || 'package';
     }
     generate() {
         return __awaiter(this, void 0, void 0, function* () {
+            let report = [];
             const dirContents = node_fs_1.default.readdirSync(node_path_1.default.join(__dirname, '..', this.TestcasesPath));
             dirContents.forEach((val) => node_fs_1.default.rmSync(node_path_1.default.join(__dirname, '..', this.TestcasesPath, val), { recursive: true, force: true }));
             const configs = Array(this.testCount).fill(null).map((val, index) => {
@@ -95,6 +99,7 @@ class GenerateTest {
                 //     { encoding: 'utf-8', flags: 'w' }
                 // )
                 let result = [];
+                let timeStart = Date.now();
                 while (true) {
                     result = [];
                     for (let [ind, line] of commandLines.entries()) {
@@ -120,9 +125,8 @@ class GenerateTest {
                     }
                     console.log(`[REGENERATE] [TEST_${index}] Regenerating...`);
                 }
+                let time = Date.now() - timeStart;
                 node_fs_1.default.writeFileSync(node_path_1.default.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`, `${this.IOFilename}.INP`), result.join('\n'), { encoding: 'utf-8' });
-                if (global.gc)
-                    global.gc();
                 const usageRamRaw = node_process_1.default.memoryUsage();
                 const usageRam = {
                     heapUsed: (usageRamRaw.heapUsed / 1024 / 1024).toFixed(3),
@@ -130,13 +134,98 @@ class GenerateTest {
                     external: (usageRamRaw.external / 1024 / 1024).toFixed(3),
                     arrayBuffers: (usageRamRaw.arrayBuffers / 1024 / 1024).toFixed(3)
                 };
-                console.log(`[RAM_REPORT] [TEST_${index + 1}] V8: ${usageRam.heapUsed}/${usageRam.heapTotal} (MB) | C++: ${usageRam.external} (MB) | ArrayBuffers: ${usageRam.arrayBuffers} (MB)`);
+                report.push({
+                    id: index,
+                    memoryUsage: usageRamRaw,
+                    time
+                });
+                console.log(`[REPORT] [TEST_${index + 1}] Time: ${(0, ms_1.default)(time)} | V8: ${usageRam.heapUsed}/${usageRam.heapTotal} (MB) | C++: ${usageRam.external} (MB) | ArrayBuffers: ${usageRam.arrayBuffers} (MB)`);
+                if (global.gc)
+                    global.gc();
+            }
+            return report;
+        });
+    }
+    runFile() {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!!this.OJ_TestcasesPath)
+                node_fs_1.default.readdirSync(this.OJ_TestcasesPath)
+                    .forEach(file => node_fs_1.default.unlinkSync(node_path_1.default.join(this.OJ_TestcasesPath, file)));
+            if (!this.MainCodePath)
+                throw new Error("MainCodePath is undefined");
+            const binaryFile = node_os_1.default.platform() == 'win32'
+                ? 'main.exe'
+                : 'main.out';
+            let paths = {
+                cwd: this.MainCodePath.split(/(\/|\\)/),
+                testcases: node_path_1.default.join(__dirname, '..', this.TestcasesPath),
+                testcasesZip: !!this.TestcasesZipPath ? node_path_1.default.join(__dirname, '..', this.TestcasesZipPath) : undefined,
+                oj: !!this.OJ_TestcasesPath ? node_path_1.default.join(__dirname, '..', this.OJ_TestcasesPath) : undefined,
+                ojZip: !!this.OJ_TestcasesZipPath ? node_path_1.default.join(__dirname, '..', this.OJ_TestcasesZipPath) : undefined,
+            };
+            const compileCommand = `${this.Compiler} -std=${this.CppVersion} -Wall -Wextra -Wpedantic -Wunused-variable -Wtype-limits -o ${binaryFile} ${paths.cwd.shift()}`;
+            console.log(`[COMPILER] Compiling....\n\t----- Live logging from compiler ----\n`);
+            console.log(`> ${compileCommand}`);
+            const spawnCb = yield this.spawn(compileCommand, paths.cwd.join(' '), { stdout: node_process_1.default.stdout, stderr: node_process_1.default.stderr });
+            console.log(`\n\t----- \t ----\n`);
+            if (spawnCb.code != 0)
+                throw new Error(`compiler throw code ${spawnCb.code}`);
+            for (let index = 0; index < this.testCount; index++) {
+                const binaryPath = paths.cwd, testcase = node_path_1.default.join(paths.testcases, `TEST_${index + 1}`), testcaseZip = paths.testcasesZip, oj = paths.oj, ojZip = paths.ojZip;
+                if (node_fs_1.default.existsSync(node_path_1.default.join(testcase, binaryFile)))
+                    node_fs_1.default.unlinkSync(node_path_1.default.join(testcase, binaryFile));
+                node_fs_1.default.copyFileSync(node_path_1.default.join(...binaryPath), testcase);
+                const startTime = Date.now();
+                const spawnCb = yield this.spawn(binaryFile, node_path_1.default.join(...binaryPath));
+                const execTime = Date.now() - startTime;
+                if (spawnCb.code != 0) {
+                    console.log(spawnCb.stdout);
+                    throw new Error(`binary file throw code ${spawnCb.code} at test ${index + 1}`);
+                }
+                if (!node_fs_1.default.existsSync(node_path_1.default.join(testcase, `${this.IOFilename}.OUT`)))
+                    throw new Error(`cant find output file at test ${index + 1}`);
+                if (oj) {
+                    node_fs_1.default.copyFileSync(node_path_1.default.join(testcase, `${this.IOFilename}.INP`), node_path_1.default.join(oj, `${this.IOFilename}_${index + 1}.INP`));
+                    node_fs_1.default.copyFileSync(node_path_1.default.join(testcase, `${this.IOFilename}.OUT`), node_path_1.default.join(oj, `${this.IOFilename}_${index + 1}.OUT`));
+                }
+                console.log(`[EXEC_FILE] [TEST_${index + 1}] Time: ${(0, ms_1.default)(execTime)}`);
             }
         });
     }
-    endStream(writeableStream) {
-        // console.log('Called')
-        return new Promise((resolve) => writeableStream.end(() => resolve()));
+    zip(path, outFile) {
+        switch (this.Zip_Program) {
+            case 'jar':
+                break;
+            default:
+            case 'package':
+                break;
+            case 'system':
+                switch (node_os_1.default.platform()) {
+                    case 'win32':
+                        break;
+                    default:
+                        break;
+                }
+                break;
+        }
+    }
+    spawn(command, cwd, pipe) {
+        return new Promise((resolve, reject) => {
+            var _a, _b;
+            const compileCommand = command.split(' ');
+            const childSpawn = node_child_process_1.default.spawn(compileCommand[0], compileCommand.slice(1), {
+                cwd,
+            });
+            if (pipe === null || pipe === void 0 ? void 0 : pipe.stdout)
+                (_a = childSpawn.stdout) === null || _a === void 0 ? void 0 : _a.pipe(pipe.stdout);
+            if (pipe === null || pipe === void 0 ? void 0 : pipe.stderr)
+                (_b = childSpawn.stdout) === null || _b === void 0 ? void 0 : _b.pipe(pipe.stderr);
+            let stdout = '';
+            childSpawn.stdout.on('data', (chunk) => stdout += chunk + '\n');
+            childSpawn.stderr.on('data', (chunk) => stdout += chunk + '\n');
+            childSpawn.on('error', (err) => { throw err; });
+            childSpawn.on('close', (code) => resolve({ code, stdout }));
+        });
     }
     parseCode(loadCode) {
         const [header, code] = loadCode.split(/-{5,}/);
@@ -169,7 +258,7 @@ class GenerateTest {
         const array = this.RegExp.arrayReg_2.exec(command) ||
             this.RegExp.arrayReg_1.exec(command) ||
             [];
-        const commands = array[1].split(' ');
+        const commands = array[1].split('; ');
         const [column, row] = (this.RegExp.arrayReg_2.test(command)
             ? [array[2], array[3]]
             : [array[2], 1])
