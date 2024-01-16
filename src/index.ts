@@ -66,12 +66,17 @@ export class GenerateTest {
     private RegExp = {
         arrayReg_1: /^\[(.+), (.+)\]$/,
         arrayReg_2: /^\[(.+), (.+) - (.+)\]$/,
+        arrayReg_3: /^\[(.+), (.+) - (.+), ""\]$/,
+        arrayReg_4: /^\[(.+), (.+) - (.+), "(.+)"\]$/,
         seqReg: /^\[(.+) -> (.+)\]$/,
-        revSegReg: /^\[(.+) <- (.+)\]/,
+        revSegReg: /^\[(.+) <- (.+)\]$/,
         assignReg: /^const (.+) = (.+)$/,
-        constReg: /\[(.+)\]/,
-        rangeReg: /\[(.+) - (.+)\]/,
-        valueReg: /{(.+)}/,
+        constReg: /^\[(.+)\]$/,
+        rangeReg: /^\[(.+) - (.+)\]$/,
+        valueReg: /^{(.+)}$/,
+        maxOfDefine: /^max\((.+)\)$/,
+        minOfDefine: /^min\((.+)\)$/,
+        function: /^(.+)\((.+)\)$/
     };
     private cached: Map<string, DataType> = new Map();
     private defineVar: Map<string, DefineVariable> = new Map();
@@ -110,10 +115,16 @@ export class GenerateTest {
         this.OJ_TestcasesZipPath = config.OJ_TestcasesZipPath
         this.Zip_Program = config.Zip_Program
     }
+    set setTestCount(count: number) {
+        this.testCount = count
+    }
     public async generate(): Promise<ReportArray[]> {
         let report: ReportArray[] = []
-        const dirContents = fs.readdirSync(path.join(__dirname, '..', this.TestcasesPath))
-        dirContents.forEach((val) => fs.rmSync(path.join(__dirname, '..', this.TestcasesPath, val), { recursive: true, force: true }))
+        const testcasesPath: string = path.join(__dirname, '..', this.TestcasesPath)
+        this.mkdir(testcasesPath)
+
+        const dirContents = fs.readdirSync(testcasesPath)
+        dirContents.forEach((val) => fs.rmSync(path.join(testcasesPath, val), { recursive: true, force: true }))
 
         const configs: TestRange[] = Array(this.testCount).fill(null).map((val, index) => {
             let lastIndex: { index: number, count: number } = { index: -1, count: 0 };
@@ -148,13 +159,15 @@ export class GenerateTest {
                 for (let [ind, line] of commandLines.entries()) {
                     const isArray =
                         this.RegExp.arrayReg_1.test(line) ||
-                        this.RegExp.arrayReg_2.test(line)
-                    const range = Array.isArray(config.range[0]) ? (config.range as TestDataRange[])[ind] : config.range as TestDataRange
+                        this.RegExp.arrayReg_2.test(line) ||
+                        this.RegExp.arrayReg_3.test(line) ||
+                        this.RegExp.arrayReg_4.test(line)
+                    const range = config.range
 
                     // let writeCb: boolean;
 
                     if (isArray)
-                        result.push(...this.parseArray(line, range))
+                        this.largePush(this.parseArray(line, range), result)
                     // writeCb = writeStream.write(this.parseArray(line, range).join(' ') + '\n')
                     else
                         result.push(this.parseLine(line, range).join(' '))
@@ -162,19 +175,21 @@ export class GenerateTest {
                 }
 
                 const func = config.func
-                if (!func) break
+                if (!func || typeof func != 'function') break
                 else {
                     const test = result.join('\n')
                     const res = await Promise.resolve(func(test))
 
                     if (res == true) break;
                 }
-                console.log(`[REGENERATE] [TEST_${index}] Regenerating...`)
+                console.log(`[REGENERATE] [TEST_${index + 1}] Regenerating...`)
             }
             let time = Date.now() - timeStart;
             fs.writeFileSync(
                 path.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`, `${this.IOFilename}.INP`),
-                result.join('\n'),
+                result
+                    .filter((val) => val.trim() != '')
+                    .join('\n'),
                 { encoding: 'utf-8' }
             )
 
@@ -219,8 +234,12 @@ export class GenerateTest {
             oj: !!this.OJ_TestcasesPath ? path.join(__dirname, '..', this.OJ_TestcasesPath) : undefined,
             ojZip: !!this.OJ_TestcasesZipPath ? path.join(__dirname, '..', this.OJ_TestcasesZipPath) : undefined,
         }
-        const compileCommand = `${this.Compiler} -std=${this.CppVersion} -Wall -Wextra -Wpedantic -Wunused-variable -Wtype-limits -o ${binaryFile} ${paths.cwd.pop()}`
+        if (!!paths.testcases) this.mkdir(paths.testcases)
+        if (!!paths.testcasesZip) this.mkdir(paths.testcasesZip)
+        if (!!paths.oj) this.mkdir(paths.oj)
+        if (!!paths.ojZip) this.mkdir(paths.ojZip)
 
+        const compileCommand = `${this.Compiler} -std=${this.CppVersion} -Wall -Wextra -Wpedantic -Wunused-variable -Wtype-limits -o ${binaryFile} ${paths.cwd.pop()}`
 
         console.log(`[COMPILER] Compiling....`)
         console.log(`\t----- Live logging from compiler ----`)
@@ -242,7 +261,7 @@ export class GenerateTest {
             const execTime = Date.now() - startTime;
             if (execCb.code != 0) {
                 console.log(execCb.stdout)
-                console.log({ binaryPath, testcase })
+                // console.log({ binaryPath, testcase })
                 throw new Error(`binary file throw code ${execCb.code} at test ${index + 1}`)
             }
 
@@ -254,20 +273,233 @@ export class GenerateTest {
 
             console.log(`[EXEC_FILE] [TEST_${index + 1}] Time: ${ms(execTime)}`)
         }
+    }
+    public async zip(config: { oj: boolean } = { oj: true }) {
+        let paths = {
+            testcases: path.join(__dirname, '..', this.TestcasesPath),
+            testcasesZip: !!this.TestcasesZipPath ? path.join(__dirname, '..', this.TestcasesZipPath) : undefined,
+            oj: !!this.OJ_TestcasesPath ? path.join(__dirname, '..', this.OJ_TestcasesPath) : undefined,
+            ojZip: !!this.OJ_TestcasesZipPath ? path.join(__dirname, '..', this.OJ_TestcasesZipPath) : undefined,
+        }
 
         if (paths.testcasesZip) {
             console.log(`[ZIPPER] Zipping testcases...`)
-            await this.zip(paths.testcases, paths.testcasesZip, this.Zip_Program)
+            await this.zip_(paths.testcases, paths.testcasesZip, this.Zip_Program)
             console.log(`[ZIPPER] Done`)
         }
-        if (paths.oj && paths.ojZip) {
+        if (paths.oj && paths.ojZip && config.oj == true) {
             console.log(`[ZIPPER] Zipping testcases (OJ format)...`)
-            await this.zip(paths.oj, paths.ojZip, this.Zip_Program)
+            await this.zip_(paths.oj, paths.ojZip, this.Zip_Program)
             console.log(`[ZIPPER] Done`)
         }
     }
 
-    private async zip(sourceDir: string, outPath: string, ZipProgram: string | null): Promise<void> {
+    private parseCode(loadCode: string): void {
+        const [header, code] = loadCode.split(/-{5,}/)
+
+        this.parseHeader(header);
+        this.testCode = code.replace(/\t/gi, '').trim();
+    }
+    private parseHeader(header: string): void {
+        header = header.replace(/\t/gi, '');
+        const defineList = header.split('\n');
+
+        for (let line of defineList) {
+            const parameter = line.split(' ');
+            const keyword: string = parameter[0];
+            const dataType: DataType_ = parameter[1] as any;
+            const dataRange: DataRange<any, any> =
+                dataType == 'char'
+                    ? [parameter[2] + (parameter.length == 4 ? ' ' : ''), '']
+                    : [parameter[2], parameter[3]].map(Number) as DataRange<number, number>;
+            const negative: boolean =
+                dataType == 'char'
+                    ? false
+                    : Number(parameter[2]) < 0;
+
+            this.defineVar.set(keyword, {
+                dataRange,
+                dataType,
+                negative
+            });
+        }
+
+        return undefined;
+    }
+    private parseArray(command: string, testRange: TestDataRange | TestDataRange[]): string[] {
+        let result: string[] = [];
+
+        const args =
+            this.RegExp.arrayReg_4.exec(command) ||
+            this.RegExp.arrayReg_3.exec(command) ||
+            this.RegExp.arrayReg_2.exec(command) ||
+            this.RegExp.arrayReg_1.exec(command) ||
+            [];
+        const [column, row] =
+            (
+                this.RegExp.arrayReg_4.test(command) || this.RegExp.arrayReg_3.test(command) || this.RegExp.arrayReg_2.test(command)
+                    ? [args[2], args[3]]
+                    : [args[2], 1]
+            )
+                .map((val) => this.cached.get(val.toString()) || val)
+                .map(Number)
+        const join =
+            this.RegExp.arrayReg_4.test(command)
+                ? args[4]
+                : ''
+
+        for (let i = 0; i < column; i++) {
+            const seq = this.RegExp.seqReg.test(args[1])
+            const revSeq = this.RegExp.revSegReg.test(args[1])
+
+            let line: string = ''
+            if (seq == true) {
+                const seqExec = this.RegExp.seqReg.exec(args[1]) || []
+                for (let j = 0; j < row; j++) {
+                    const begin = this.temp.lastItem || seqExec[1];
+                    const end = this.cached.get(seqExec[2]) ? (j + 1) / row * Number(this.cached.get(seqExec[2])) : seqExec[2];
+                    // console.log({ begin, end, cache: this.cached })
+                    const generated = this.parseCommand(`[${begin} - ${end}]`, testRange);
+                    this.temp.lastItem = generated;
+                    line += generated + join;
+                }
+            } else if (revSeq == true) {
+                const seqExec = this.RegExp.revSegReg.exec(args[1]) || []
+                for (let j = 0; j < row; j++) {
+                    const begin = this.cached.get(seqExec[2]) ? (row - j + 1) / row * Number(this.cached.get(seqExec[2])) : seqExec[2];
+                    const end = this.temp.lastItem || seqExec[2];
+                    // console.log({ begin, end, cache: this.cached })
+                    const generated = this.parseCommand(`[${begin} - ${end}]`, testRange);
+                    this.temp.lastItem = generated;
+                    line += generated + join;
+                }
+            } else
+                for (let j = 0; j < row; j++)
+                    line += this.parseLine(args[1], testRange).join(' ') + join
+
+            result.push(line);
+            // console.log({ line, result })
+        }
+
+        return result
+    }
+    private parseLine(line: string, testRange: TestDataRange | TestDataRange[]): string[] {
+        const commands: string[] = line.split(';');
+        let result: string[] = [];
+
+        for (let command of commands)
+            result.push(this.parseCommand(command, testRange));
+
+        return result;
+    }
+    public parseCommand(fullCommand: string, testRange: TestDataRange | TestDataRange[]): string {
+        // console.log({ fullCommand, testRange })
+
+        fullCommand = fullCommand.trim();
+        if (fullCommand == '') return '';
+
+        if (this.RegExp.minOfDefine.test(fullCommand)) {
+            const minODExec = this.RegExp.minOfDefine.exec(fullCommand) || []
+            const define = this.defineVar.get(minODExec[1])
+            if (!define) throw new Error('Cant find define of command: ' + minODExec[1])
+            const range = Array.isArray(testRange[0])
+                ? (testRange as TestDataRange[])[Array.from(this.defineVar).findIndex((val) => val[0] == minODExec[1])]
+                : testRange as TestDataRange
+
+            return (define.dataRange[1] - define.dataRange[0]) * range[0] + define.dataRange[0]
+        } else if (this.RegExp.maxOfDefine.test(fullCommand)) {
+            const maxODExec = this.RegExp.maxOfDefine.exec(fullCommand) || []
+            const define = this.defineVar.get(maxODExec[1])
+            if (!define) throw new Error('Cant find define of command: ' + maxODExec[1])
+            const range = Array.isArray(testRange[0])
+                ? (testRange as TestDataRange[])[Array.from(this.defineVar).findIndex((val) => val[0] == maxODExec[1])]
+                : testRange as TestDataRange
+
+            return (define.dataRange[1] - define.dataRange[0]) * range[1] + define.dataRange[0]
+        } else if (this.RegExp.assignReg.test(fullCommand)) {
+            const assignExec = this.RegExp.assignReg.exec(fullCommand) || [];
+            const keyword = assignExec[1];
+            const command = assignExec[2];
+
+            const generate = this.parseCommand(command, testRange);
+
+            this.cached.set(keyword, generate)
+
+            return generate
+
+        } else if (this.RegExp.rangeReg.test(fullCommand)) {
+            const line = this.RegExp.rangeReg.exec(fullCommand) || [];
+
+            let [start, end] = [this.cached.get(line[1]) || line[1], this.cached.get(line[2]) || line[2]].map(String) as [any, any]
+            if (this.RegExp.function.test(start)) start = this.parseCommand(start, testRange);
+            if (this.RegExp.function.test(end)) end = this.parseCommand(end, testRange);
+
+            [start, end] = [start, end].map(Number)
+
+            return this.getRandomInt(start, end).toString();
+        } else if (this.RegExp.valueReg.test(fullCommand)) {
+            const keyword = (this.RegExp.valueReg.exec(fullCommand) || [])[1];
+            return eval(keyword) || '';
+        } else if (this.RegExp.constReg.test(fullCommand)) {
+            const keyword = (this.RegExp.constReg.exec(fullCommand) || [])[1];
+            return this.cached.get(keyword)?.toString() || '';
+        } else {
+
+            let command = fullCommand.split(' ');
+
+            let ghost: boolean = command.includes('ghost'),
+                cache: boolean = command.includes('const');
+            [ghost, cache]
+                .filter(val => val == true)
+                .forEach(() => void command.shift());
+            const define = this.defineVar.get(command[0]);
+            // console.log({ command, define, testRange })
+
+            if (!define) throw new Error('Cant find define of command: ' + command)
+            const range = Array.isArray(testRange[0])
+                ? (testRange as TestDataRange[])[Array.from(this.defineVar).findIndex((val) => val[0] == command[0])]
+                : testRange as TestDataRange
+
+            let result: DataType = '';
+            if (define.dataType == 'char') result = this.getRandomCharacter(define.dataRange[0])
+            else if (define.dataType == 'number') result = this.getRandomInt(
+                (define.dataRange[1] - define.dataRange[0]) * range[0] + define.dataRange[0],
+                (define.dataRange[1] - define.dataRange[0]) * range[1] + define.dataRange[0]
+            ) * (
+                    define.negative == true
+                        ? Math.floor(Math.random()) == 0 ? 1 : -1
+                        : 1
+                );
+
+            if (cache) this.cached.set(command[0], result)
+            return ghost == true ? '' : result.toString();
+        }
+    }
+
+    public getRandomInt(min: number, max: number): number {
+        min = Math.floor(min);
+        max = Math.ceil(max);
+        if (min == max) return min
+        else return crypto.randomInt(min, max);
+    }
+    public getRandomCharacter(str: string): string {
+        return str[crypto.randomInt(0, str.length - 1)];
+    }
+
+    private largePush(src: any[], dest: any[]) {
+        for (let index of src) {
+            dest.push(index)
+        }
+    }
+    private mkdir(directory: string) {
+        let temp: string = '';
+        for (let dir of directory.split('/').slice(0, -1)) {
+            temp = path.join(temp, dir)
+            if (!fs.existsSync(temp)) fs.mkdirSync(temp)
+        }
+        return undefined
+    }
+    private async zip_(sourceDir: string, outPath: string, ZipProgram: string | null): Promise<void> {
         switch (ZipProgram) {
             default:
                 console.log(`[ZIPPER] WARNING: Using default zip program: package (archiver ${package_json.dependencies.archiver})`)
@@ -339,166 +571,5 @@ export class GenerateTest {
             childExec.on('error', (err) => { throw err })
             childExec.on('close', (code) => resolve({ code, stdout }))
         })
-    }
-    private parseCode(loadCode: string): void {
-        const [header, code] = loadCode.split(/-{5,}/)
-
-        this.parseHeader(header);
-        this.testCode = code.replace(/\t/gi, '').trim();
-    }
-    private parseHeader(header: string): void {
-        header = header.replace(/\t/gi, '');
-        const defineList = header.split('\n');
-
-        for (let line of defineList) {
-            const parameter = line.split(' ');
-            const keyword: string = parameter[0];
-            const dataType: DataType_ = parameter[1] as any;
-            const dataRange: DataRange<any, any> =
-                dataType == 'char'
-                    ? [parameter[2] + (parameter.length == 4 ? ' ' : ''), '']
-                    : [parameter[2], parameter[3]].map(Number) as DataRange<number, number>;
-            const negative: boolean =
-                dataType == 'char'
-                    ? false
-                    : Number(parameter[2]) < 0;
-
-            this.defineVar.set(keyword, {
-                dataRange,
-                dataType,
-                negative
-            });
-        }
-
-        return undefined;
-    }
-    private parseArray(command: string, testRange: TestDataRange): string[] {
-        let result: string[] = [];
-
-        const args =
-            this.RegExp.arrayReg_2.exec(command) ||
-            this.RegExp.arrayReg_1.exec(command) ||
-            [];
-        const commands: string[] = args[1].split('; ');
-        const [column, row] =
-            (
-                this.RegExp.arrayReg_2.test(command)
-                    ? [args[2], args[3]]
-                    : [args[2], 1]
-            )
-                .map((val) => this.cached.get(val.toString()) || val)
-                .map(Number)
-
-        for (let i = 0; i < column; i++) {
-            const seq = this.RegExp.seqReg.test(args[1])
-            const revSeq = this.RegExp.revSegReg.test(args[1])
-
-            let line: string = ''
-            if (seq == true) {
-                const seqExec = this.RegExp.seqReg.exec(args[1]) || []
-                for (let j = 0; j < row; j++) {
-                    const begin = this.temp.lastItem || seqExec[1];
-                    const end = this.cached.get(seqExec[2]) ? (j + 1) / row * Number(this.cached.get(seqExec[2])) : seqExec[2];
-                    console.log({ begin, end, cache: this.cached })
-                    const generated = this.parseCommand(`[${begin} - ${end}]`, testRange);
-                    this.temp.lastItem = generated;
-                    line += generated + ' ';
-                }
-            } else if (revSeq == true) {
-                const seqExec = this.RegExp.revSegReg.exec(args[1]) || []
-                for (let j = 0; j < row; j++) {
-                    const begin = this.cached.get(seqExec[2]) ? (row - j + 1) / row * Number(this.cached.get(seqExec[2])) : seqExec[2];
-                    const end = this.temp.lastItem || seqExec[2];
-                    console.log({ begin, end, cache: this.cached })
-                    const generated = this.parseCommand(`[${begin} - ${end}]`, testRange);
-                    this.temp.lastItem = generated;
-                    line += generated + ' ';
-                }
-            } else
-                for (let j = 0; j < row; j++)
-                    for (let command of commands)
-                        line += this.parseLine(command, testRange) + ' '
-
-            result.push(line);
-        }
-
-        return result
-    }
-    private parseLine(line: string, testRange: TestDataRange): string[] {
-        const commands: string[] = line.split(';');
-        let result: string[] = [];
-
-        for (let command of commands)
-            result.push(this.parseCommand(command, testRange));
-
-        return result;
-    }
-    public parseCommand(fullCommand: string, testRange: TestDataRange): string {
-        // console.log({ fullCommand, testRange })
-
-        fullCommand = fullCommand.trim();
-        if (fullCommand == '') return '';
-
-        if (this.RegExp.assignReg.test(fullCommand)) {
-            const assignExec = this.RegExp.assignReg.exec(fullCommand) || [];
-            const keyword = assignExec[1];
-            const command = assignExec[2];
-
-            const generate = this.parseCommand(command, testRange);
-
-            this.cached.set(keyword, generate)
-
-            return generate
-
-        } else if (this.RegExp.rangeReg.test(fullCommand)) {
-            const line = this.RegExp.rangeReg.exec(fullCommand) || [];
-
-            const [start, end] = [this.cached.get(line[1]) || line[1], this.cached.get(line[2]) || line[2]].map(Number)
-            // console.log({ start, end })
-
-            return this.getRandomInt(start, end).toString();
-        } else if (this.RegExp.valueReg.test(fullCommand)) {
-            const keyword = (this.RegExp.valueReg.exec(fullCommand) || [])[1];
-            return eval(keyword) || '';
-        } else if (this.RegExp.constReg.test(fullCommand)) {
-            const keyword = (this.RegExp.constReg.exec(fullCommand) || [])[1];
-            return this.cached.get(keyword)?.toString() || '';
-        } else {
-            let command = fullCommand.split(' ');
-
-            let ghost: boolean = command.includes('ghost'),
-                cache: boolean = command.includes('const');
-            [ghost, cache]
-                .filter(val => val == true)
-                .forEach(() => void command.shift());
-            const define = this.defineVar.get(command[0]);
-            // console.log({ command, define, testRange })
-
-            if (!define) throw new Error('Cant find define of command: ' + command)
-
-            let result: DataType = '';
-            if (define.dataType == 'char') result = this.getRandomCharacter(define.dataRange[0])
-            else if (define.dataType == 'number') result = this.getRandomInt(
-                (define.dataRange[1] - define.dataRange[0]) * testRange[0] + define.dataRange[0],
-                (define.dataRange[1] - define.dataRange[0]) * testRange[1] + define.dataRange[0]
-            ) * (
-                    define.negative == true
-                        ? Math.floor(Math.random()) == 0 ? 1 : -1
-                        : 1
-                );
-
-            if (cache) this.cached.set(command[0], result)
-            return ghost == true ? '' : result.toString();
-        }
-    }
-
-    public getRandomInt(min: number, max: number): number {
-        min = Math.floor(min);
-        max = Math.ceil(max);
-        if (min == max) return min
-        else return crypto.randomInt(min, max);
-    }
-    public getRandomCharacter(str: string): string {
-        return str[crypto.randomInt(0, str.length - 1)];
     }
 }
