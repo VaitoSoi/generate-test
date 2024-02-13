@@ -11,12 +11,21 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
+var _a, _b, _c, _d;
 Object.defineProperty(exports, "__esModule", { value: true });
 const index_1 = require("./index");
-const unzip_1 = require("./unzip");
 const node_fs_1 = __importDefault(require("node:fs"));
 const node_path_1 = __importDefault(require("node:path"));
 const yaml_1 = __importDefault(require("yaml"));
+const node_stream_zip_1 = __importDefault(require("node-stream-zip"));
+function UnZip(sourceDir, destinationDir) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const stream = new node_stream_zip_1.default.async({ file: sourceDir });
+        const entries = yield stream.extract(null, destinationDir);
+        stream.close();
+        return entries;
+    });
+}
 const rawConfig = yaml_1.default.parse(node_fs_1.default.readFileSync(process.argv[2] || 'config.yaml', 'utf8'));
 let config = {
     TestCount: rawConfig.TestCount,
@@ -30,10 +39,10 @@ let config = {
     }),
     TestCode: rawConfig.TestCode,
     MainCodePath: rawConfig.MainCodePath,
-    TestcasesPath: rawConfig.TestcasesPath.replace(/\{IO\}/gi, rawConfig.IOFilename),
-    TestcasesZipPath: rawConfig.TestcasesZip.replace(/\{IO\}/gi, rawConfig.IOFilename),
-    OJ_TestcasesPath: rawConfig.OJ_TestcasesPath.replace(/\{IO\}/gi, rawConfig.IOFilename),
-    OJ_TestcasesZipPath: rawConfig.OJ_TestcasesZip.replace(/\{IO\}/gi, rawConfig.IOFilename),
+    TestcasesPath: (_a = rawConfig.TestcasesPath) === null || _a === void 0 ? void 0 : _a.replace(/\{IO\}/gi, rawConfig.IOFilename || '{IO}'),
+    TestcasesZipPath: (_b = rawConfig.TestcasesZip) === null || _b === void 0 ? void 0 : _b.replace(/\{IO\}/gi, rawConfig.IOFilename || '{IO}'),
+    OJ_TestcasesPath: (_c = rawConfig.OJ_TestcasesPath) === null || _c === void 0 ? void 0 : _c.replace(/\{IO\}/gi, rawConfig.IOFilename || '{IO}'),
+    OJ_TestcasesZipPath: (_d = rawConfig.OJ_TestcasesZip) === null || _d === void 0 ? void 0 : _d.replace(/\{IO\}/gi, rawConfig.IOFilename || '{IO}'),
     Compiler: rawConfig.Compiler,
     CppVersion: rawConfig.CppVersion,
     IOFilename: rawConfig.IOFilename,
@@ -44,15 +53,16 @@ generate.setConfig(config);
 run();
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
+        let report = [];
         if (process.argv.includes('-g') || process.argv.includes('--generate')) {
             console.time('Generate time');
-            yield generate.generate();
+            report = yield generate.generate();
             console.timeEnd('Generate time');
         }
         else if (process.argv.includes('-u') || process.argv.includes('--unzip')) {
             const dirContents = node_fs_1.default.readdirSync(config.TestcasesPath);
             dirContents.forEach((val) => node_fs_1.default.rmSync(node_path_1.default.join(config.TestcasesPath, val), { recursive: true, force: true }));
-            yield (0, unzip_1.UnZip)(config.TestcasesZipPath, config.TestcasesPath);
+            yield UnZip(config.TestcasesZipPath, config.TestcasesPath);
             const tests = node_fs_1.default.readdirSync(config.TestcasesPath).length;
             console.log(`[UNZIPPER] Unzipped ${tests} testcases`);
             if (!!tests)
@@ -62,5 +72,20 @@ function run() {
             yield generate.runFile();
         if (process.argv.includes('-z') || process.argv.includes('--z'))
             yield generate.zip({ oj: process.argv.includes('-r') || process.argv.includes('--run') });
+        if (process.argv.includes('--report')) {
+            if (!process.argv.includes('-g') && !process.argv.includes('--generate'))
+                throw new Error('No report');
+            const totalTime = report.reduce((acc, val) => acc + val.time, 0);
+            const totalMemory = report.reduce((acc, val) => acc + val.memoryUsage.rss, 0) / 1024 / 1024;
+            const totalV8Memory = report.reduce((acc, val) => acc + val.memoryUsage.heapUsed, 0) / 1024 / 1024;
+            const totalCppMemory = report.reduce((acc, val) => acc + val.memoryUsage.external, 0) / 1024 / 1024;
+            const totalArrayMemory = report.reduce((acc, val) => acc + val.memoryUsage.arrayBuffers, 0) / 1024 / 1024;
+            console.log(`Report:\n` +
+                `> Avr. Time: ${totalTime / report.length} (ms)\n` +
+                `> Avr. Memory: ${(totalMemory / report.length).toFixed(3)} (MB)\n` +
+                `> Avr. V8 Memory: ${(totalV8Memory / report.length).toFixed(3)} (MB)\n` +
+                `> Avr. Cpp Memory: ${(totalCppMemory / report.length).toFixed(3)} (MB)\n` +
+                `> Avr. Array Memory: ${(totalArrayMemory / report.length).toFixed(3)} (MB)`);
+        }
     });
 }

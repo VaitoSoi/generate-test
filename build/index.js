@@ -148,14 +148,15 @@ class GenerateTest {
                     heapUsed: (usageRamRaw.heapUsed / 1024 / 1024).toFixed(3),
                     heapTotal: (usageRamRaw.heapTotal / 1024 / 1024).toFixed(3),
                     external: (usageRamRaw.external / 1024 / 1024).toFixed(3),
-                    arrayBuffers: (usageRamRaw.arrayBuffers / 1024 / 1024).toFixed(3)
+                    arrayBuffers: (usageRamRaw.arrayBuffers / 1024 / 1024).toFixed(3),
+                    rss: (usageRamRaw.rss / 1024 / 1024).toFixed(3)
                 };
                 report.push({
                     id: index,
                     memoryUsage: usageRamRaw,
                     time
                 });
-                console.log(`[REPORT] [TEST_${index + 1}] Time: ${(0, ms_1.default)(time)} | V8: ${usageRam.heapUsed}/${usageRam.heapTotal} (MB) | C++: ${usageRam.external} (MB) | ArrayBuffers: ${usageRam.arrayBuffers} (MB)`);
+                console.log(`[REPORT] [TEST_${index + 1}] Time: ${(0, ms_1.default)(time)} | Total: ${usageRam.rss} (MB) | V8: ${usageRam.heapUsed}/${usageRam.heapTotal} (MB) | C++: ${usageRam.external} (MB) | ArrayBuffers: ${usageRam.arrayBuffers} (MB)`);
                 if (global.gc)
                     global.gc();
             }
@@ -360,9 +361,9 @@ class GenerateTest {
         else if (this.RegExp.rangeReg.test(fullCommand)) {
             const line = this.RegExp.rangeReg.exec(fullCommand) || [];
             let [start, end] = [this.cached.get(line[1]) || line[1], this.cached.get(line[2]) || line[2]].map(String);
-            if (this.RegExp.function.test(start))
+            if (this.RegExp.function.test(start) || this.RegExp.valueReg.test(start))
                 start = this.parseCommand(start, testRange);
-            if (this.RegExp.function.test(end))
+            if (this.RegExp.function.test(end) || this.RegExp.valueReg.test(end))
                 end = this.parseCommand(end, testRange);
             [start, end] = [start, end].map(Number);
             return this.getRandomInt(start, end).toString();
