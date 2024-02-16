@@ -16,7 +16,7 @@ let config = {
     TestCount: rawConfig.TestCount,
     TestRange: (rawConfig.TestRange as { range: [number, number], count: number, func?: string }[]).map<TestRange>((val) => {
         let resObj: any = val;
-        if (!!val.func) resObj.func = require(path.join(__dirname, '..', val.func))
+        if (!!val.func) resObj.func = require(path.join(__dirname, '..', val.func)).default || require(path.join(__dirname, '..', val.func))
         else val.func = undefined;
 
         return resObj

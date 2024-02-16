@@ -32,7 +32,7 @@ let config = {
     TestRange: rawConfig.TestRange.map((val) => {
         let resObj = val;
         if (!!val.func)
-            resObj.func = require(node_path_1.default.join(__dirname, '..', val.func));
+            resObj.func = require(node_path_1.default.join(__dirname, '..', val.func)).default || require(node_path_1.default.join(__dirname, '..', val.func));
         else
             val.func = undefined;
         return resObj;

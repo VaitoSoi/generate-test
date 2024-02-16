@@ -8,7 +8,9 @@
   "scripts": {
     "build": "yarn run compile",
     "compile": "npx tsc && echo Compile complete :D",
-    "start": "yarn run compile && node ./build/generate.js"
+    "start": "yarn run compile && node ./build/generate.js",
+    "local": "npx tsc --project ./file/func && echo Compiled function file :D && yarn run compile && node ./build/generate.js",
+    "test": "npx ts-node src/generate.ts"
   },
   "dependencies": {
     "@types/archiver": "^5.3.3",

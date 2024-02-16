@@ -143,6 +143,7 @@ export class GenerateTest {
 
         for (let [index, config] of configs.entries()) {
             this.temp = {}
+            this.temp.currentTest = index
 
             if (!fs.existsSync(path.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`)))
                 fs.mkdirSync(path.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`))
@@ -178,7 +179,7 @@ export class GenerateTest {
                 if (!func || typeof func != 'function') break
                 else {
                     const test = result.join('\n')
-                    const res = await Promise.resolve(func(test))
+                    const res = await Promise.resolve(func(test, { currentTest: index, testCount: this.testCount }))
 
                     if (res == true) break;
                 }
@@ -267,7 +268,7 @@ export class GenerateTest {
             }
 
             if (!fs.existsSync(path.join(testcase, `${this.IOFilename}.OUT`))) throw new Error(`cant find output file at test ${index + 1}`)
-            if (oj) {
+            if (!!oj) {
                 fs.copyFileSync(path.join(testcase, `${this.IOFilename}.INP`), path.join(oj, `${this.IOFilename}_${index + 1}.INP`))
                 fs.copyFileSync(path.join(testcase, `${this.IOFilename}.OUT`), path.join(oj, `${this.IOFilename}_${index + 1}.OUT`))
             }
@@ -385,16 +386,20 @@ export class GenerateTest {
         return result
     }
     private parseLine(line: string, testRange: TestDataRange | TestDataRange[]): string[] {
-        const commands: string[] = line.split(';');
         let result: string[] = [];
+        if (!this.RegExp.valueReg.test(line)) {
+            const commands: string[] = line.split(';');
 
-        for (let command of commands)
-            result.push(this.parseCommand(command, testRange));
+            for (let command of commands)
+                result.push(this.parseCommand(command, testRange));
+        } else result = [
+            this.parseCommand(line, testRange)
+        ]
 
         return result;
     }
     public parseCommand(fullCommand: string, testRange: TestDataRange | TestDataRange[]): string {
-        // console.log({ fullCommand, testRange })
+        // console.log({ fullCommand })
 
         fullCommand = fullCommand.trim();
         if (fullCommand == '') return '';
@@ -402,7 +407,7 @@ export class GenerateTest {
         if (this.RegExp.minOfDefine.test(fullCommand)) {
             const minODExec = this.RegExp.minOfDefine.exec(fullCommand) || []
             const define = this.defineVar.get(minODExec[1])
-            if (!define) throw new Error('Cant find define of command: ' + minODExec[1])
+            if (!define) throw new Error('cant find define of command: ' + minODExec[1])
             const range = Array.isArray(testRange[0])
                 ? (testRange as TestDataRange[])[Array.from(this.defineVar).findIndex((val) => val[0] == minODExec[1])]
                 : testRange as TestDataRange
@@ -411,7 +416,7 @@ export class GenerateTest {
         } else if (this.RegExp.maxOfDefine.test(fullCommand)) {
             const maxODExec = this.RegExp.maxOfDefine.exec(fullCommand) || []
             const define = this.defineVar.get(maxODExec[1])
-            if (!define) throw new Error('Cant find define of command: ' + maxODExec[1])
+            if (!define) throw new Error('cant find define of command: ' + maxODExec[1])
             const range = Array.isArray(testRange[0])
                 ? (testRange as TestDataRange[])[Array.from(this.defineVar).findIndex((val) => val[0] == maxODExec[1])]
                 : testRange as TestDataRange
@@ -422,11 +427,11 @@ export class GenerateTest {
             const keyword = assignExec[1];
             const command = assignExec[2];
 
-            const generate = this.parseCommand(command, testRange);
+            const value = this.parseCommand(command, testRange);
 
-            this.cached.set(keyword, generate)
+            this.cached.set(keyword, value)
 
-            return generate
+            return value
 
         } else if (this.RegExp.rangeReg.test(fullCommand)) {
             const line = this.RegExp.rangeReg.exec(fullCommand) || [];
@@ -435,11 +440,29 @@ export class GenerateTest {
             if (this.RegExp.function.test(start) || this.RegExp.valueReg.test(start)) start = this.parseCommand(start, testRange);
             if (this.RegExp.function.test(end) || this.RegExp.valueReg.test(end)) end = this.parseCommand(end, testRange);
 
+            // console.log({ start, end });
             [start, end] = [start, end].map(Number)
 
             return this.getRandomInt(start, end).toString();
         } else if (this.RegExp.valueReg.test(fullCommand)) {
             const keyword = (this.RegExp.valueReg.exec(fullCommand) || [])[1];
+            const user: Record<string, (...param: any[]) => any> = {
+                max: (define) => this.parseCommand(`max(${define})`, testRange),
+                min: (define) => this.parseCommand(`min(${define})`, testRange),
+                get: (define) => this.cached.get(define),
+                set: (define, value) => this.cached.set(define, value),
+                cmd: (command) => {
+                    const isArray =
+                        this.RegExp.arrayReg_1.test(command) ||
+                        this.RegExp.arrayReg_2.test(command) ||
+                        this.RegExp.arrayReg_3.test(command) ||
+                        this.RegExp.arrayReg_4.test(command)
+                    if (isArray) return this.parseArray(command, testRange).join('\n')
+                    else return this.parseLine(command, testRange)
+                },
+                current: () => this.temp.currentTest,
+                total: () => this.testCount,
+            }
             return eval(keyword) || '';
         } else if (this.RegExp.constReg.test(fullCommand)) {
             const keyword = (this.RegExp.constReg.exec(fullCommand) || [])[1];
@@ -456,7 +479,7 @@ export class GenerateTest {
             const define = this.defineVar.get(command[0]);
             // console.log({ command, define, testRange })
 
-            if (!define) throw new Error('Cant find define of command: ' + command)
+            if (!define) throw new Error('cant find define of command: ' + command)
             const range = Array.isArray(testRange[0])
                 ? (testRange as TestDataRange[])[Array.from(this.defineVar).findIndex((val) => val[0] == command[0])]
                 : testRange as TestDataRange
