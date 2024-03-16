@@ -1,4 +1,27 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -13,12 +36,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GenerateTest = void 0;
-const node_process_1 = __importDefault(require("node:process"));
-const node_crypto_1 = __importDefault(require("node:crypto"));
-const node_fs_1 = __importDefault(require("node:fs"));
-const node_path_1 = __importDefault(require("node:path"));
-const node_os_1 = __importDefault(require("node:os"));
-const node_child_process_1 = __importDefault(require("node:child_process"));
+const process = __importStar(require("node:process"));
+const crypto = __importStar(require("node:crypto"));
+const fs = __importStar(require("node:fs"));
+const path = __importStar(require("node:path"));
+const os = __importStar(require("node:os"));
+const child_process = __importStar(require("node:child_process"));
 const ms_1 = __importDefault(require("ms"));
 const archiver_1 = __importDefault(require("archiver"));
 const package_json_1 = __importDefault(require("../package.json"));
@@ -84,10 +107,10 @@ class GenerateTest {
     generate() {
         return __awaiter(this, void 0, void 0, function* () {
             let report = [];
-            const testcasesPath = node_path_1.default.join(__dirname, '..', this.TestcasesPath);
+            const testcasesPath = path.join(__dirname, '..', this.TestcasesPath);
             this.mkdir(testcasesPath);
-            const dirContents = node_fs_1.default.readdirSync(testcasesPath);
-            dirContents.forEach((val) => node_fs_1.default.rmSync(node_path_1.default.join(testcasesPath, val), { recursive: true, force: true }));
+            const dirContents = fs.readdirSync(testcasesPath);
+            dirContents.forEach((val) => fs.rmSync(path.join(testcasesPath, val), { recursive: true, force: true }));
             const configs = Array(this.testCount).fill(null).map((val, index) => {
                 let lastIndex = { index: -1, count: 0 };
                 const config = this.testRange.find((val, ind) => {
@@ -105,8 +128,8 @@ class GenerateTest {
             for (let [index, config] of configs.entries()) {
                 this.temp = {};
                 this.temp.currentTest = index;
-                if (!node_fs_1.default.existsSync(node_path_1.default.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`)))
-                    node_fs_1.default.mkdirSync(node_path_1.default.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`));
+                if (!fs.existsSync(path.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`)))
+                    fs.mkdirSync(path.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`));
                 // const writeStream = fs.createWriteStream(
                 //     path.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`, `${this.IOFilename}.INP`),
                 //     { encoding: 'utf-8', flags: 'w' }
@@ -141,10 +164,10 @@ class GenerateTest {
                     console.log(`[REGENERATE] [TEST_${index + 1}] Regenerating...`);
                 }
                 let time = Date.now() - timeStart;
-                node_fs_1.default.writeFileSync(node_path_1.default.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`, `${this.IOFilename}.INP`), result
+                fs.writeFileSync(path.join(__dirname, '..', this.TestcasesPath, `TEST_${index + 1}`, `${this.IOFilename}.INP`), result
                     .filter((val) => val.trim() != '')
                     .join('\n'), { encoding: 'utf-8' });
-                const usageRamRaw = node_process_1.default.memoryUsage();
+                const usageRamRaw = process.memoryUsage();
                 const usageRam = {
                     heapUsed: (usageRamRaw.heapUsed / 1024 / 1024).toFixed(3),
                     heapTotal: (usageRamRaw.heapTotal / 1024 / 1024).toFixed(3),
@@ -167,22 +190,22 @@ class GenerateTest {
     runFile() {
         return __awaiter(this, void 0, void 0, function* () {
             if (!!this.OJ_TestcasesPath)
-                node_fs_1.default.readdirSync(this.OJ_TestcasesPath)
-                    .forEach(file => node_fs_1.default.unlinkSync(node_path_1.default.join(this.OJ_TestcasesPath, file)));
+                fs.readdirSync(this.OJ_TestcasesPath)
+                    .forEach(file => fs.unlinkSync(path.join(this.OJ_TestcasesPath, file)));
             if (!this.MainCodePath)
                 throw new Error("MainCodePath is undefined");
-            const binaryFile = node_os_1.default.platform() == 'win32'
+            const binaryFile = os.platform() == 'win32'
                 ? 'main.exe'
                 : 'main.out';
-            const binaryFilePath = node_os_1.default.platform() == 'win32'
+            const binaryFilePath = os.platform() == 'win32'
                 ? 'main.exe'
                 : './main.out';
             let paths = {
                 cwd: this.MainCodePath.split(/(\/|\\)/gi),
-                testcases: node_path_1.default.join(__dirname, '..', this.TestcasesPath),
-                testcasesZip: !!this.TestcasesZipPath ? node_path_1.default.join(__dirname, '..', this.TestcasesZipPath) : undefined,
-                oj: !!this.OJ_TestcasesPath ? node_path_1.default.join(__dirname, '..', this.OJ_TestcasesPath) : undefined,
-                ojZip: !!this.OJ_TestcasesZipPath ? node_path_1.default.join(__dirname, '..', this.OJ_TestcasesZipPath) : undefined,
+                testcases: path.join(__dirname, '..', this.TestcasesPath),
+                testcasesZip: !!this.TestcasesZipPath ? path.join(__dirname, '..', this.TestcasesZipPath) : undefined,
+                oj: !!this.OJ_TestcasesPath ? path.join(__dirname, '..', this.OJ_TestcasesPath) : undefined,
+                ojZip: !!this.OJ_TestcasesZipPath ? path.join(__dirname, '..', this.OJ_TestcasesZipPath) : undefined,
             };
             if (!!paths.testcases)
                 this.mkdir(paths.testcases);
@@ -196,15 +219,15 @@ class GenerateTest {
             console.log(`[COMPILER] Compiling....`);
             console.log(`\t----- Live logging from compiler ----`);
             console.log(`> ${compileCommand}`);
-            const execCb = yield this.exec(compileCommand, paths.cwd.join('/'), { stdout: node_process_1.default.stdout, stderr: node_process_1.default.stderr });
+            const execCb = yield this.exec(compileCommand, paths.cwd.join('/'), { stdout: process.stdout, stderr: process.stderr });
             console.log(`\n\t-------------------------------------`);
             if (execCb.code != 0)
                 throw new Error(`compiler throw code ${execCb.code}`);
             for (let index = 0; index < this.testCount; index++) {
-                const binaryPath = paths.cwd, testcase = node_path_1.default.join(paths.testcases, `TEST_${index + 1}`), oj = paths.oj;
-                if (node_fs_1.default.existsSync(node_path_1.default.join(testcase, binaryFile)))
-                    node_fs_1.default.unlinkSync(node_path_1.default.join(testcase, binaryFile));
-                node_fs_1.default.copyFileSync(node_path_1.default.join(...binaryPath, binaryFile), node_path_1.default.join(testcase, binaryFile));
+                const binaryPath = paths.cwd, testcase = path.join(paths.testcases, `TEST_${index + 1}`), oj = paths.oj;
+                if (fs.existsSync(path.join(testcase, binaryFile)))
+                    fs.unlinkSync(path.join(testcase, binaryFile));
+                fs.copyFileSync(path.join(...binaryPath, binaryFile), path.join(testcase, binaryFile));
                 const startTime = Date.now();
                 const execCb = yield this.exec(binaryFilePath, testcase);
                 const execTime = Date.now() - startTime;
@@ -213,11 +236,11 @@ class GenerateTest {
                     // console.log({ binaryPath, testcase })
                     throw new Error(`binary file throw code ${execCb.code} at test ${index + 1}`);
                 }
-                if (!node_fs_1.default.existsSync(node_path_1.default.join(testcase, `${this.IOFilename}.OUT`)))
+                if (!fs.existsSync(path.join(testcase, `${this.IOFilename}.OUT`)))
                     throw new Error(`cant find output file at test ${index + 1}`);
                 if (!!oj) {
-                    node_fs_1.default.copyFileSync(node_path_1.default.join(testcase, `${this.IOFilename}.INP`), node_path_1.default.join(oj, `${this.IOFilename}_${index + 1}.INP`));
-                    node_fs_1.default.copyFileSync(node_path_1.default.join(testcase, `${this.IOFilename}.OUT`), node_path_1.default.join(oj, `${this.IOFilename}_${index + 1}.OUT`));
+                    fs.copyFileSync(path.join(testcase, `${this.IOFilename}.INP`), path.join(oj, `${this.IOFilename}_${index + 1}.INP`));
+                    fs.copyFileSync(path.join(testcase, `${this.IOFilename}.OUT`), path.join(oj, `${this.IOFilename}_${index + 1}.OUT`));
                 }
                 console.log(`[EXEC_FILE] [TEST_${index + 1}] Time: ${(0, ms_1.default)(execTime)}`);
             }
@@ -226,10 +249,10 @@ class GenerateTest {
     zip(config = { oj: true }) {
         return __awaiter(this, void 0, void 0, function* () {
             let paths = {
-                testcases: node_path_1.default.join(__dirname, '..', this.TestcasesPath),
-                testcasesZip: !!this.TestcasesZipPath ? node_path_1.default.join(__dirname, '..', this.TestcasesZipPath) : undefined,
-                oj: !!this.OJ_TestcasesPath ? node_path_1.default.join(__dirname, '..', this.OJ_TestcasesPath) : undefined,
-                ojZip: !!this.OJ_TestcasesZipPath ? node_path_1.default.join(__dirname, '..', this.OJ_TestcasesZipPath) : undefined,
+                testcases: path.join(__dirname, '..', this.TestcasesPath),
+                testcasesZip: !!this.TestcasesZipPath ? path.join(__dirname, '..', this.TestcasesZipPath) : undefined,
+                oj: !!this.OJ_TestcasesPath ? path.join(__dirname, '..', this.OJ_TestcasesPath) : undefined,
+                ojZip: !!this.OJ_TestcasesZipPath ? path.join(__dirname, '..', this.OJ_TestcasesZipPath) : undefined,
             };
             if (paths.testcasesZip) {
                 console.log(`[ZIPPER] Zipping testcases...`);
@@ -320,15 +343,17 @@ class GenerateTest {
     }
     parseLine(line, testRange) {
         let result = [];
-        if (!this.RegExp.valueReg.test(line)) {
-            const commands = line.split(';');
-            for (let command of commands)
-                result.push(this.parseCommand(command, testRange));
+        let commands = line.split(';').map((val) => val.trim());
+        for (let start = 0; start < commands.length; start++) {
+            if (commands[start].includes('{') && !commands[start].includes('}'))
+                for (let end = start + 1; end < commands.length; end++)
+                    if (commands[end].includes('}')) {
+                        commands.splice(start, end + 1, commands.slice(start, end + 1).join('; '));
+                        break;
+                    }
         }
-        else
-            result = [
-                this.parseCommand(line, testRange)
-            ];
+        for (let command of commands)
+            result.push(this.parseCommand(command, testRange));
         return result;
     }
     parseCommand(fullCommand, testRange) {
@@ -404,7 +429,7 @@ class GenerateTest {
         }
         else {
             let command = fullCommand.split(' ');
-            let ghost = command.includes('ghost'), cache = command.includes('const');
+            const ghost = command.includes('ghost'), cache = command.includes('const');
             [ghost, cache]
                 .filter(val => val == true)
                 .forEach(() => void command.shift());
@@ -424,7 +449,7 @@ class GenerateTest {
                     : 1);
             if (cache)
                 this.cached.set(command[0], result);
-            return ghost == true ? '' : result.toString();
+            return !!ghost ? '' : result.toString();
         }
     }
     getRandomInt(min, max) {
@@ -433,10 +458,10 @@ class GenerateTest {
         if (min == max)
             return min;
         else
-            return node_crypto_1.default.randomInt(min, max);
+            return crypto.randomInt(min, max);
     }
     getRandomCharacter(str) {
-        return str[node_crypto_1.default.randomInt(0, str.length - 1)];
+        return str[crypto.randomInt(0, str.length - 1)];
     }
     largePush(src, dest) {
         for (let index of src) {
@@ -446,9 +471,9 @@ class GenerateTest {
     mkdir(directory) {
         let temp = '';
         for (let dir of directory.split('/').slice(0, -1)) {
-            temp = node_path_1.default.join(temp, dir);
-            if (!node_fs_1.default.existsSync(temp))
-                node_fs_1.default.mkdirSync(temp);
+            temp = path.join(temp, dir);
+            if (!fs.existsSync(temp))
+                fs.mkdirSync(temp);
         }
         return undefined;
     }
@@ -461,11 +486,11 @@ class GenerateTest {
                     return yield this.zipDirectory(sourceDir, outPath);
                     break;
                 case 'system':
-                    switch (node_os_1.default.type()) {
+                    switch (os.type()) {
                         case 'Linux':
                             yield this.exec(`zip -r temp.zip .`, sourceDir);
-                            node_fs_1.default.copyFileSync(sourceDir + '/temp.zip', outPath);
-                            node_fs_1.default.rmSync(sourceDir + '/temp.zip');
+                            fs.copyFileSync(sourceDir + '/temp.zip', outPath);
+                            fs.rmSync(sourceDir + '/temp.zip');
                             return undefined;
                             break;
                         default:
@@ -482,7 +507,7 @@ class GenerateTest {
     }
     zipDirectory(sourceDir, outPath) {
         const archive = (0, archiver_1.default)('zip', { zlib: { level: 9 } });
-        const stream = node_fs_1.default.createWriteStream(outPath);
+        const stream = fs.createWriteStream(outPath);
         return new Promise((resolve, reject) => {
             archive.directory(sourceDir, false);
             archive.on('error', (err) => { throw err; });
@@ -495,9 +520,9 @@ class GenerateTest {
         return new Promise((resolve, reject) => {
             var _a, _b;
             const compileCommand = command.split(' ');
-            const childSpawn = !!cwd ? node_child_process_1.default.spawn(compileCommand[0], compileCommand.slice(1), {
+            const childSpawn = !!cwd ? child_process.spawn(compileCommand[0], compileCommand.slice(1), {
                 cwd,
-            }) : node_child_process_1.default.spawn(compileCommand[0], compileCommand.slice(1));
+            }) : child_process.spawn(compileCommand[0], compileCommand.slice(1));
             if (pipe === null || pipe === void 0 ? void 0 : pipe.stdout)
                 (_a = childSpawn.stdout) === null || _a === void 0 ? void 0 : _a.pipe(pipe.stdout);
             if (pipe === null || pipe === void 0 ? void 0 : pipe.stderr)
@@ -512,9 +537,9 @@ class GenerateTest {
     exec(command, cwd, pipe) {
         return new Promise((resolve, reject) => {
             var _a, _b, _c, _d;
-            const childExec = !!cwd ? node_child_process_1.default.exec(command, {
+            const childExec = !!cwd ? child_process.exec(command, {
                 cwd,
-            }) : node_child_process_1.default.exec(command);
+            }) : child_process.exec(command);
             if (pipe === null || pipe === void 0 ? void 0 : pipe.stdout)
                 (_a = childExec.stdout) === null || _a === void 0 ? void 0 : _a.pipe(pipe.stdout);
             if (pipe === null || pipe === void 0 ? void 0 : pipe.stderr)

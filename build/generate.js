@@ -18,6 +18,7 @@ const node_fs_1 = __importDefault(require("node:fs"));
 const node_path_1 = __importDefault(require("node:path"));
 const yaml_1 = __importDefault(require("yaml"));
 const node_stream_zip_1 = __importDefault(require("node-stream-zip"));
+const node_process_1 = __importDefault(require("node:process"));
 function UnZip(sourceDir, destinationDir) {
     return __awaiter(this, void 0, void 0, function* () {
         const stream = new node_stream_zip_1.default.async({ file: sourceDir });
@@ -26,7 +27,7 @@ function UnZip(sourceDir, destinationDir) {
         return entries;
     });
 }
-const rawConfig = yaml_1.default.parse(node_fs_1.default.readFileSync(process.argv[2] || 'config.yaml', 'utf8'));
+const rawConfig = yaml_1.default.parse(node_fs_1.default.readFileSync(node_process_1.default.argv[2] || 'config.yaml', 'utf8'));
 let config = {
     TestCount: rawConfig.TestCount,
     TestRange: rawConfig.TestRange.map((val) => {
@@ -54,12 +55,12 @@ run();
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         let report = [];
-        if (process.argv.includes('-g') || process.argv.includes('--generate')) {
+        if (node_process_1.default.argv.includes('-g') || node_process_1.default.argv.includes('--generate')) {
             console.time('Generate time');
             report = yield generate.generate();
             console.timeEnd('Generate time');
         }
-        else if (process.argv.includes('-u') || process.argv.includes('--unzip')) {
+        else if (node_process_1.default.argv.includes('-u') || node_process_1.default.argv.includes('--unzip')) {
             const dirContents = node_fs_1.default.readdirSync(config.TestcasesPath);
             dirContents.forEach((val) => node_fs_1.default.rmSync(node_path_1.default.join(config.TestcasesPath, val), { recursive: true, force: true }));
             yield UnZip(config.TestcasesZipPath, config.TestcasesPath);
@@ -68,12 +69,12 @@ function run() {
             if (!!tests)
                 generate.setTestCount = tests;
         }
-        if (!!config.MainCodePath && (process.argv.includes('-r') || process.argv.includes('--run')))
+        if (!!config.MainCodePath && (node_process_1.default.argv.includes('-r') || node_process_1.default.argv.includes('--run')))
             yield generate.runFile();
-        if (process.argv.includes('-z') || process.argv.includes('--z'))
-            yield generate.zip({ oj: process.argv.includes('-r') || process.argv.includes('--run') });
-        if (process.argv.includes('--report')) {
-            if (!process.argv.includes('-g') && !process.argv.includes('--generate'))
+        if (node_process_1.default.argv.includes('-z') || node_process_1.default.argv.includes('--zip'))
+            yield generate.zip({ oj: node_process_1.default.argv.includes('-r') || node_process_1.default.argv.includes('--run') });
+        if (node_process_1.default.argv.includes('--report')) {
+            if (!node_process_1.default.argv.includes('-g') && !node_process_1.default.argv.includes('--generate') || report.length == 0)
                 throw new Error('No report');
             const totalTime = report.reduce((acc, val) => acc + val.time, 0);
             const totalMemory = report.reduce((acc, val) => acc + val.memoryUsage.rss, 0) / 1024 / 1024;

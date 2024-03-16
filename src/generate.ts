@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import yaml from 'yaml'
 import zip_stream from 'node-stream-zip'
+import process from 'node:process'
 
 async function UnZip(sourceDir: string, destinationDir: string): Promise<number | undefined> {
     const stream = new zip_stream.async({ file: sourceDir })
@@ -14,7 +15,7 @@ async function UnZip(sourceDir: string, destinationDir: string): Promise<number 
 const rawConfig = yaml.parse(fs.readFileSync(process.argv[2] || 'config.yaml', 'utf8')) as any
 let config = {
     TestCount: rawConfig.TestCount,
-    TestRange: (rawConfig.TestRange as { range: [number, number], count: number, func?: string }[]).map<TestRange>((val) => {
+    TestRange: (rawConfig.TestRange as any[]).map<TestRange>((val) => {
         let resObj: any = val;
         if (!!val.func) resObj.func = require(path.join(__dirname, '..', val.func)).default || require(path.join(__dirname, '..', val.func))
         else val.func = undefined;
@@ -62,10 +63,10 @@ async function run() {
 
     if (!!config.MainCodePath && (process.argv.includes('-r') || process.argv.includes('--run'))) await generate.runFile()
 
-    if (process.argv.includes('-z') || process.argv.includes('--z')) await generate.zip({ oj: process.argv.includes('-r') || process.argv.includes('--run') })
+    if (process.argv.includes('-z') || process.argv.includes('--zip')) await generate.zip({ oj: process.argv.includes('-r') || process.argv.includes('--run') })
 
     if (process.argv.includes('--report')) {
-        if (!process.argv.includes('-g') && !process.argv.includes('--generate')) throw new Error('No report')
+        if (!process.argv.includes('-g') && !process.argv.includes('--generate') || report.length == 0) throw new Error('No report')
         const totalTime = report.reduce((acc, val) => acc + val.time, 0)
         const totalMemory = report.reduce((acc, val) => acc + val.memoryUsage.rss, 0) / 1024 / 1024
         const totalV8Memory = report.reduce((acc, val) => acc + val.memoryUsage.heapUsed, 0) / 1024 / 1024

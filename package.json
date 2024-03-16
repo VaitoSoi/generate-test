@@ -9,16 +9,15 @@
     "build": "yarn run compile",
     "compile": "npx tsc && echo Compile complete :D",
     "start": "yarn run compile && node ./build/generate.js",
+    "node": "node ./build/generate.js",
     "local": "npx tsc --project ./file/func && echo Compiled function file :D && yarn run compile && node ./build/generate.js",
     "test": "npx ts-node src/generate.ts"
   },
   "dependencies": {
     "@types/archiver": "^5.3.3",
-    "@types/lodash": "^4.14.202",
     "@types/ms": "^0.7.34",
     "@types/node": "^20.8.6",
     "archiver": "5.3.1",
-    "lodash": "^4.17.21",
     "ms": "^2.1.3",
     "node-stream-zip": "^1.15.0",
     "ts-node": "^10.9.1",

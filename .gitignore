@@ -135,4 +135,5 @@ test*
 main*
 
 # etc
-.vscode/settings.json
+.vscode/
+.history/

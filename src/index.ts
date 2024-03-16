@@ -1,11 +1,10 @@
-import process from "node:process";
-import crypto from 'node:crypto';
-import fs from 'node:fs';
-import path from "node:path";
-import os from 'node:os'
-import child_process from 'node:child_process';
-import stream from 'node:stream'
-import _ from 'lodash';
+import * as process from "node:process";
+import * as crypto from 'node:crypto';
+import * as fs from 'node:fs';
+import * as path from "node:path";
+import * as os from 'node:os'
+import * as child_process from 'node:child_process';
+import * as stream from 'node:stream'
 import ms from 'ms'
 import archiver from "archiver";
 import package_json from "../package.json"
@@ -387,14 +386,18 @@ export class GenerateTest {
     }
     private parseLine(line: string, testRange: TestDataRange | TestDataRange[]): string[] {
         let result: string[] = [];
-        if (!this.RegExp.valueReg.test(line)) {
-            const commands: string[] = line.split(';');
+        let commands: string[] = line.split(';').map((val) => val.trim());
+        for (let start = 0; start < commands.length; start++) {
+            if (commands[start].includes('{') && !commands[start].includes('}'))
+                for (let end = start + 1; end < commands.length; end++)
+                    if (commands[end].includes('}')) {
+                        commands.splice(start, end + 1, commands.slice(start, end + 1).join('; '))
+                        break;
+                    }
+        }
 
-            for (let command of commands)
-                result.push(this.parseCommand(command, testRange));
-        } else result = [
-            this.parseCommand(line, testRange)
-        ]
+        for (let command of commands)
+            result.push(this.parseCommand(command, testRange));
 
         return result;
     }
@@ -471,7 +474,7 @@ export class GenerateTest {
 
             let command = fullCommand.split(' ');
 
-            let ghost: boolean = command.includes('ghost'),
+            const ghost: boolean = command.includes('ghost'),
                 cache: boolean = command.includes('const');
             [ghost, cache]
                 .filter(val => val == true)
@@ -496,7 +499,7 @@ export class GenerateTest {
                 );
 
             if (cache) this.cached.set(command[0], result)
-            return ghost == true ? '' : result.toString();
+            return !!ghost ? '' : result.toString();
         }
     }
 
@@ -510,7 +513,7 @@ export class GenerateTest {
         return str[crypto.randomInt(0, str.length - 1)];
     }
 
-    private largePush(src: any[], dest: any[]) {
+    private largePush(src: any[], dest: any[]): void {
         for (let index of src) {
             dest.push(index)
         }
