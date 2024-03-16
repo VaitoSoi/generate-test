@@ -108,6 +108,7 @@
   },
   "exclude": [
     "./file/",
-    "./src/test.ts"
+    "./src/test.ts",
+    "./build/*"
   ]
 }
