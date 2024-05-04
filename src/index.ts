@@ -30,11 +30,11 @@ export interface TestRange {
     count: number,
     func?: Executable<[val: string, ...param: any[]], boolean>;
 }
-export interface TestConfig {
-    range: TestRange
-    testcasePath: string;
-    ojPath: string;
-}
+// export interface TestConfig {
+//     range: TestRange
+//     testcasePath: string;
+//     ojPath: string;
+// }
 export interface GTOptions {
     TestCount: number;
     TestRange: TestRange[];
@@ -471,7 +471,6 @@ export class GenerateTest {
             const keyword = (this.RegExp.constReg.exec(fullCommand) || [])[1];
             return this.cached.get(keyword)?.toString() || '';
         } else {
-
             let command = fullCommand.split(' ');
 
             const ghost: boolean = command.includes('ghost'),
@@ -565,23 +564,6 @@ export class GenerateTest {
             stream.on('close', () => resolve());
             archive.finalize();
         });
-    }
-    private spawn(command: string, cwd?: string, pipe?: { stdout?: stream.Writable, stderr?: stream.Writable }): Promise<{ code: number | null, stdout: string }> {
-        return new Promise((resolve, reject) => {
-            const compileCommand = command.split(' ')
-            const childSpawn = !!cwd ? child_process.spawn(compileCommand[0], compileCommand.slice(1), {
-                cwd,
-            }) : child_process.spawn(compileCommand[0], compileCommand.slice(1))
-            if (pipe?.stdout) childSpawn.stdout?.pipe(pipe.stdout)
-            if (pipe?.stderr) childSpawn.stdout?.pipe(pipe.stderr)
-
-            let stdout: string = ''
-            childSpawn.stdout.on('data', (chunk) => stdout += chunk + '\n')
-            childSpawn.stderr.on('data', (chunk) => stdout += chunk + '\n')
-
-            childSpawn.on('error', (err) => { throw err })
-            childSpawn.on('close', (code) => resolve({ code, stdout }))
-        })
     }
     private exec(command: string, cwd?: string, pipe?: { stdout?: stream.Writable, stderr?: stream.Writable }): Promise<{ code: number | null, stdout: string }> {
         return new Promise((resolve, reject) => {
